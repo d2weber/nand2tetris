@@ -27,34 +27,31 @@ M=-1
 //; Fill screen with pattern
 (FILL)
 
-@8192
-D=A
-@counter //; counts backwards
-M=D
-
-//; Start address to fill
+//; let p point to last pixel on screen
 @SCREEN
 D=A
+@8191
+D=D+A
 @p
 M=D
 
-(FILLLOOP)
+(FILL_LOOP)
 
-//; if counter==0 goto MAINLOOP; --counter
-@counter
-D=M
-M=M-1
-@MAINLOOP
-D;JEQ
-
-//; put pattern to current address
+//; put pattern to RAM[p]
 @pattern
 D=M
 @p
 A=M
 M=D
-@p
-M=M+1
 
-@FILLLOOP
+//; --p; if p==SCREEN break;
+@p
+D=M
+M=M-1
+@SCREEN
+D=A-D
+@FILL_LOOP
+D;JNE
+
+@MAINLOOP
 0;JMP
