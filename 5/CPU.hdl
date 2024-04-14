@@ -32,5 +32,47 @@ CHIP CPU {
         pc[15];          // address of next instruction
 
     PARTS:
-	//// Replace this comment with your code.
+    DMux(in=true, sel=instruction[15], a=isAinstr, b=isCinstr);
+
+    // instruction[3]: store M
+    And(a=isCinstr, b=instruction[3], out=writeM);
+
+    Mux16(a=aluOut, b[0..14]=instruction[0..14], sel=isAinstr, out=inA);
+
+    // instruction[5]: store A
+    And(a=isCinstr, b=instruction[5], out=isCandStoreA);
+    Or(a=isAinstr, b=isCandStoreA, out=aLoad);
+    ARegister(in=inA, load=aLoad, out=outA, out[0..14]=addressM);
+
+    // instruction[12]: use_a (a==0)
+    Mux16(a=outA, b=inM, sel=instruction[12], out=AorM);
+
+    // instruction[4]: store D
+    And(a=isCinstr, b=instruction[4], out=dLoad);
+    DRegister(in=aluOut, load=dLoad, out=dOut);
+
+    ALU(x=dOut, y=AorM,
+        zx=instruction[11],
+        nx=instruction[10],
+        zy=instruction[9],
+        ny=instruction[8],
+        f =instruction[7],
+        no=instruction[6],
+        out=aluOut,
+        out=outM,
+        zr=aluEq,
+        ng=aluLt
+     );
+
+
+    Or(a=aluEq, b=aluLt, out=aluLe);
+    Not(in=aluLe, out=aluGt);
+
+    And(a=instruction[0], b=aluGt, out=jgt);
+    And(a=instruction[1], b=aluEq, out=jeq);
+    And(a=instruction[2], b=aluLt, out=jlt);
+    Or8Way(in[0]=jgt, in[1]=jeq, in[2]=jlt, out=jumpAny);
+    And(a=isCinstr, b=jumpAny, out=PcLoad);
+
+    PC(in=outA, load=PcLoad, inc=true, reset=reset, out[0..14]=pc);
 }
