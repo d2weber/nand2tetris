@@ -25,5 +25,12 @@ CHIP Memory {
     OUT out[16];
 
     PARTS:
-	//// Replace this comment with your code.
+    DMux(in=load, sel=address[14], a=ldram, b=ldscreen);
+    // Assume load is false if keyboard is queried
+
+    RAM16K(in=in, load=ldram, address=address[0..13], out=ram);
+    Screen(in=in, load=ldscreen, address=address[0..12], out=screen);
+    Keyboard(out=keyboard);
+
+    Mux4Way16(a=ram, b=ram, c=screen, d=keyboard, sel=address[13..14], out=out);
 }
