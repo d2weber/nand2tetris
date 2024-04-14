@@ -17,10 +17,9 @@ M=0
 
 //; Jump to end if R0==0; --R0
 @R0
-D=M
-M=M-1
+MD=M-1
 @END
-D;JEQ
+D+1;JEQ
 
 //; R2+=R1
 @R1

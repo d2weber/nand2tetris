@@ -30,8 +30,7 @@ D;JEQ
 
 (FILL_WHITE)
 @counter
-M=M-1   //; --counter
-D=M
+MD=M-1   //; --counter
 @SCREEN
 A=D+A   //; set RAM[SCREEN+counter]
 M=0
@@ -44,8 +43,7 @@ D;JNE
 
 (FILL_BLACK)
 @counter
-M=M-1   //; --counter
-D=M
+MD=M-1   //; --counter
 @SCREEN
 A=D+A   //; set RAM[SCREEN+counter]
 M=-1
