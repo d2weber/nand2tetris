@@ -10,12 +10,10 @@
 
 (MAIN_LOOP)
 
-//; let p point to last pixel on screen
-@SCREEN
-D=A
+//; set counter to end
 @8192
-D=D+A
-@p
+D=A
+@counter
 M=D
 
 //; if KBD==0 goto FILL_WHITE else goto FILL_BLACK
@@ -27,30 +25,28 @@ D;JEQ
 0;JMP
 
 (FILL_WHITE)
-@p
-M=M-1 //; --p
-D=M   //; save p for later
-A=M   //; set RAM[p]
+@counter
+M=M-1 //; --counter
+D=M
+@SCREEN
+A=D+A   //; set RAM[SCREEN+counter]
 M=0
 
-//; repeat if D!=SCREEN else goto MAIN_LOOP; --p;
-@SCREEN
-D=A-D
+//; repeat if D!=0 else goto MAIN_LOOP; --counter;
 @FILL_WHITE
 D;JNE
 @MAIN_LOOP
 0;JMP
 
 (FILL_BLACK)
-@p
-M=M-1 //; --p
-D=M   //; save p for later
-A=M   //; set RAM[p]
+@counter
+M=M-1 //; --counter
+D=M
+@SCREEN
+A=D+A   //; set RAM[SCREEN+counter]
 M=-1
 
-//; repeat if D!=SCREEN else goto MAIN_LOOP; --p;
-@SCREEN
-D=A-D
+//; repeat if D!=0 else goto MAIN_LOOP; --counter;
 @FILL_BLACK
 D;JNE
 @MAIN_LOOP
