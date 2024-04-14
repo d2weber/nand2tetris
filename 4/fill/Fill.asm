@@ -19,6 +19,10 @@ M=D
 //; if KBD==0 goto FILL_WHITE else goto FILL_BLACK
 @KBD
 D=M
+//; Use separate implementations for black and white to save
+//; the instruction for color loading in the busy loop
+//; This does not really speed up things in the emulator but
+//; it probably would on real hardware
 @FILL_WHITE
 D;JEQ
 @FILL_BLACK
@@ -26,13 +30,13 @@ D;JEQ
 
 (FILL_WHITE)
 @counter
-M=M-1 //; --counter
+M=M-1   //; --counter
 D=M
 @SCREEN
 A=D+A   //; set RAM[SCREEN+counter]
 M=0
 
-//; repeat if D!=0 else goto MAIN_LOOP; --counter;
+//; repeat if D!=0 else goto MAIN_LOOP
 @FILL_WHITE
 D;JNE
 @MAIN_LOOP
@@ -40,13 +44,13 @@ D;JNE
 
 (FILL_BLACK)
 @counter
-M=M-1 //; --counter
+M=M-1   //; --counter
 D=M
 @SCREEN
 A=D+A   //; set RAM[SCREEN+counter]
 M=-1
 
-//; repeat if D!=0 else goto MAIN_LOOP; --counter;
+//; repeat if D!=0 else goto MAIN_LOOP
 @FILL_BLACK
 D;JNE
 @MAIN_LOOP
