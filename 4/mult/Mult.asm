@@ -9,10 +9,8 @@
 
 
 //; Init R2
-@0
-D=A
 @R2
-M=D
+M=0
 
 //; Perform R0 accumulations of R1
 (LOOP)
