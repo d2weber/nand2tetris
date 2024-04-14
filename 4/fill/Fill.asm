@@ -8,50 +8,50 @@
 //; i.e. writes "black" in every pixel. When no key is pressed,
 //; the screen should be cleared.
 
-(MAINLOOP)
-
-//; pattern=white
-@pattern
-M=0
-
-//; If KBD==0 skip to fill with white pattern
-@KBD
-D=M
-@FILL
-D;JEQ
-
-//; pattern=black
-@pattern
-M=-1
-
-//; Fill screen with pattern
-(FILL)
+(MAIN_LOOP)
 
 //; let p point to last pixel on screen
 @SCREEN
 D=A
-@8191
+@8192
 D=D+A
 @p
 M=D
 
-(FILL_LOOP)
-
-//; put pattern to RAM[p]
-@pattern
+//; if KBD==0 goto FILL_WHITE else goto FILL_BLACK
+@KBD
 D=M
-@p
-A=M
-M=D
+@FILL_WHITE
+D;JEQ
+@FILL_BLACK
+0;JMP
 
-//; --p; if p==SCREEN break;
+(FILL_WHITE)
 @p
-D=M
-M=M-1
+M=M-1 //; --p
+D=M   //; save p for later
+A=M   //; set RAM[p]
+M=0
+
+//; repeat if D!=SCREEN else goto MAIN_LOOP; --p;
 @SCREEN
 D=A-D
-@FILL_LOOP
+@FILL_WHITE
 D;JNE
+@MAIN_LOOP
+0;JMP
 
-@MAINLOOP
+(FILL_BLACK)
+@p
+M=M-1 //; --p
+D=M   //; save p for later
+A=M   //; set RAM[p]
+M=-1
+
+//; repeat if D!=SCREEN else goto MAIN_LOOP; --p;
+@SCREEN
+D=A-D
+@FILL_BLACK
+D;JNE
+@MAIN_LOOP
 0;JMP
