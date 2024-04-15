@@ -1,4 +1,20 @@
-use std::{env, fs, path::Path};
+use std::{
+    collections::{hash_map::Entry, HashMap},
+    env, fs,
+    path::Path,
+};
+
+fn main() {
+    let mut args = env::args();
+    if args.len() != 2 {
+        panic!("Expect single parameter to `*.asm` file.");
+    }
+    let filename = args.next_back().unwrap();
+    let result = assemble(&Path::new(&filename));
+
+    // I prefer to print to stdout, users can easily pipe to a file
+    print!("{result}");
+}
 
 #[cfg(test)]
 mod test {
@@ -20,6 +36,16 @@ mod test {
         test_assemble("../pong/PongL.asm");
     }
 
+    #[test]
+    fn max() {
+        test_assemble("../max/Max.asm");
+    }
+
+    #[test]
+    fn pong() {
+        test_assemble("../pong/Pong.asm");
+    }
+
     /// Takes the path to an `*.asm*` file relative to the MANIFEST_DIR and
     /// tests the generated assembly against a `*.hack` file next to it.
     fn test_assemble(asm_file: &str) {
@@ -37,25 +63,27 @@ mod test {
     }
 }
 
-fn strip_comment(s: &str) -> &str {
-    if let Some((content, _comment)) = s.split_once("//") {
-        content
-    } else {
-        s
-    }
-}
-
 fn assemble(asm_file: &Path) -> String {
-    let mut result = fs::read_to_string(asm_file)
-        .expect(&format!("Couldn't read {}.", asm_file.display()))
-        .lines()
-        .map(|l| strip_comment(l).trim())
-        .filter(|l| !l.is_empty())
+    let asm_file =
+        fs::read_to_string(asm_file).expect(&format!("Couldn't read {}.", asm_file.display()));
+
+    let mut symbols = first_pass(&asm_file);
+    let mut last_symbol_address = 15;
+    let mut result = trimmed_lines(&asm_file)
+        .filter(|l| l.chars().next().unwrap() != '(')
         .map(|l| {
-            if let Some(a_expr) = l.strip_prefix("@") {
-                let value = a_expr
-                    .parse::<i16>()
-                    .expect(&format!("Couldn't parse A-instruction `{l}`"));
+            if let Some(a_expr) = l.strip_prefix('@') {
+                let value = if is_symbol(a_expr) {
+                    let entry = symbols.entry(a_expr);
+                    if matches!(entry, Entry::Vacant(_)) {
+                        last_symbol_address += 1;
+                    }
+                    *entry.or_insert(last_symbol_address)
+                } else {
+                    a_expr
+                        .parse::<i32>()
+                        .expect(&format!("Couldn't parse A-instruction `{l}`"))
+                };
                 format!("0{value:015b}")
             } else {
                 // C-instruction
@@ -131,12 +159,68 @@ fn assemble(asm_file: &Path) -> String {
     result
 }
 
-fn main() {
-    let mut args = env::args();
-    if args.len() != 2 {
-        panic!("Expect single parameter to `*.asm` file.");
+#[must_use]
+fn first_pass(asm_file: &String) -> HashMap<&str, i32> {
+    let mut symbols = HashMap::from([
+        ("R0", 0),
+        ("R1", 1),
+        ("R2", 2),
+        ("R3", 3),
+        ("R4", 4),
+        ("R5", 5),
+        ("R6", 6),
+        ("R7", 7),
+        ("R8", 8),
+        ("R9", 9),
+        ("R10", 10),
+        ("R11", 11),
+        ("R12", 12),
+        ("R13", 13),
+        ("R14", 14),
+        ("R15", 15),
+        ("SP", 0),
+        ("LCL", 1),
+        ("ARG", 2),
+        ("THIS", 3),
+        ("THAT", 4),
+        ("SCREEN", 16384),
+        ("KBD", 24576),
+        ("LOOP", 4),
+        ("STOP", 18),
+        ("i", 16),
+        ("sum", 17),
+    ]);
+    let mut byte_offset = 0;
+    trimmed_lines(asm_file).for_each(|l| {
+        if let Some(sym_name) = l.strip_prefix('(') {
+            let sym_name = sym_name
+                .strip_suffix(')')
+                .expect("Missing closing bracket for symbol.");
+            symbols.entry(sym_name).or_insert(byte_offset);
+        } else {
+            byte_offset += 1;
+        }
+    });
+    symbols
+}
+
+fn trimmed_lines(s: &str) -> impl Iterator<Item = &str> {
+    s.lines()
+        .map(|l| strip_comment(l).trim())
+        .filter(|l| !l.is_empty())
+}
+
+fn strip_comment(s: &str) -> &str {
+    if let Some((content, _comment)) = s.split_once("//") {
+        content
+    } else {
+        s
     }
-    let filename = args.next_back().unwrap();
-    let result = assemble(&Path::new(&filename));
-    print!("{result}");
+}
+
+fn is_symbol(s: &str) -> bool {
+    !s.chars()
+        .next()
+        .expect("Identifier expected")
+        .is_ascii_digit()
 }
