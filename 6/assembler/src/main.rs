@@ -10,7 +10,7 @@ fn main() {
         panic!("Expect single parameter to `*.asm` file.");
     }
     let filename = args.next_back().unwrap();
-    let result = assemble(&Path::new(&filename));
+    let result = assemble(Path::new(&filename));
 
     // I prefer to print to stdout, users can easily pipe to a file
     print!("{result}");
@@ -64,25 +64,24 @@ mod test {
 }
 
 fn assemble(asm_file: &Path) -> String {
-    let asm_file =
-        fs::read_to_string(asm_file).expect(&format!("Couldn't read {}.", asm_file.display()));
+    let asm_file = fs::read_to_string(asm_file)
+        .unwrap_or_else(|_| panic!("Couldn't read {}.", asm_file.display()));
 
     let mut symbols = first_pass(&asm_file);
     let mut last_symbol_address = 15;
     let mut result = trimmed_lines(&asm_file)
-        .filter(|l| l.chars().next().unwrap() != '(')
+        .filter(|l| !l.starts_with('('))
         .map(|l| {
             if let Some(a_expr) = l.strip_prefix('@') {
                 let value = if is_symbol(a_expr) {
-                    let entry = symbols.entry(a_expr);
-                    if matches!(entry, Entry::Vacant(_)) {
+                    *symbols.entry(a_expr).or_insert_with(|| {
                         last_symbol_address += 1;
-                    }
-                    *entry.or_insert(last_symbol_address)
+                        last_symbol_address
+                    })
                 } else {
                     a_expr
                         .parse::<i32>()
-                        .expect(&format!("Couldn't parse A-instruction `{l}`"))
+                        .unwrap_or_else(|_| panic!("Couldn't parse A-instruction `{l}`"))
                 };
                 format!("0{value:015b}")
             } else {
@@ -160,7 +159,7 @@ fn assemble(asm_file: &Path) -> String {
 }
 
 #[must_use]
-fn first_pass(asm_file: &String) -> HashMap<&str, i32> {
+fn first_pass(asm_file: &str) -> HashMap<&str, i32> {
     let mut symbols = HashMap::from([
         ("R0", 0),
         ("R1", 1),
