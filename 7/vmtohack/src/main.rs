@@ -110,18 +110,20 @@ M=0
         )
 }
 
+/// Decrease stack pointer and set A to the popped element
+fn pop(p_name: &str) -> String {
+    format!("@{p_name}\nAM=M-1")
+}
+
+/// Set A to the last element on the stack
 fn peek(p_name: &str) -> String {
     format!("@{p_name}\nA=M-1")
 }
 
+/// Pop one element of the stack into D and peek
 fn pop_and_peek(p_name: &str) -> String {
-    format!(
-        r#"@{p_name}
-AM=M-1
-D=M
-@{p_name}
-A=M-1"#
-    )
+    let (pop, peek) = (pop(p_name), peek(p_name));
+    format!("{pop}\nD=M\n{peek}")
 }
 
 fn trimmed_lines(s: &str) -> impl Iterator<Item = &str> {
