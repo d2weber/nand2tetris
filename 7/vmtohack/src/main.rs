@@ -59,7 +59,7 @@ fn vm_translate(asm_file: &Path) {
         .map(|l| {
             let mut parts = l.split_whitespace();
             let operation = parts.next().expect("Empty lines have been filtered out");
-            match operation {
+            let asm = match operation {
                 "add" => pop_and_peek("SP") + "\nM=M+D",
                 "sub" => pop_and_peek("SP") + "\nM=M-D",
                 "neg" => peek("SP") + "\nM=-M",
@@ -80,21 +80,22 @@ fn vm_translate(asm_file: &Path) {
                         .unwrap_or_else(|_| panic!("Could not parse number in `{l}`"));
                     match (operation, namespace) {
                         ("push", "constant") => format!("@{offset}\nD=A\n{}", push_d("SP")),
-                        ("push", "local") => read_to_d("LCL", offset) + &push_d("SP"),
-                        ("push", "argument") => read_to_d("ARG", offset) + &push_d("SP"),
-                        ("push", "this") => read_to_d("THIS", offset) + &push_d("SP"),
-                        ("push", "that") => read_to_d("THAT", offset) + &push_d("SP"),
-                        ("push", "temp") => read_to_d("5", offset) + &push_d("SP"), // TODO: optimize
-                        ("pop", "local") => read_to_d("LCL", offset) + &push_d("SP"),
-                        ("pop", "argument") => read_to_d("ARG", offset) + &push_d("SP"),
-                        ("pop", "this") => read_to_d("THIS", offset) + &push_d("SP"),
-                        ("pop", "that") => read_to_d("THAT", offset) + &push_d("SP"),
-                        ("pop", "temp") => read_to_d("5", offset) + &push_d("SP"), // TODO: optimize
-                        _ => panic!("Cannot {operation} to `{namespace}`"),
+                        ("push", "local") => read_to_d("LCL", offset) + "\n" + &push_d("SP"),
+                        ("push", "argument") => read_to_d("ARG", offset) + "\n" + &push_d("SP"),
+                        ("push", "this") => read_to_d("THIS", offset) + "\n" + &push_d("SP"),
+                        ("push", "that") => read_to_d("THAT", offset) + "\n" + &push_d("SP"),
+                        ("push", "temp") => read_tmp(offset) + "\n" + &push_d("SP"),
+                        ("pop", "local") => write_from_d("LCL", offset),
+                        ("pop", "argument") => write_from_d("ARG", offset),
+                        ("pop", "this") => write_from_d("THIS", offset),
+                        ("pop", "that") => write_from_d("THAT", offset),
+                        ("pop", "temp") => write_tmp(offset),
+                        _ => panic!("Cannot {operation} from `{namespace}`"),
                     }
                 }
                 _ => panic!("Unexpected expression `{l}`"),
-            }
+            };
+            format!("// {l}\n{asm}")
         })
         .collect::<Vec<String>>()
         .join("\n");
@@ -119,14 +120,43 @@ M=0
         )
 }
 
+fn read_tmp(mut offset: usize) -> String {
+    offset += 5;
+    format!("@{offset}\nD=M")
+}
+
 fn read_to_d(p_name: &str, offset: usize) -> String {
     format!(
         // TODO: optimize for offset=0 and offset=1
         r#"@{offset}
 D=A
 @{p_name}
-A=A+D
+A=M+D
 D=M"#
+    )
+}
+
+fn write_tmp(mut offset: usize) -> String {
+    offset += 5;
+    let pop = pop_to_d("SP");
+    format!("{pop}\n@{offset}\nM=D")
+}
+
+fn write_from_d(p_name: &str, offset: usize) -> String {
+    format!(
+        // TODO: optimize for offset=0 and offset=1
+        r#"@{offset}
+D=A
+@{p_name}
+D=M+D
+@R13
+M=D
+@SP
+AM=M-1
+D=M
+@R13
+A=M
+M=D"#
     )
 }
 
