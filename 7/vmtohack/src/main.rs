@@ -60,15 +60,7 @@ fn vm_translate(asm_file: &Path) {
                         )
                     });
 
-                    format!(
-                        "\
-                        @{number}\n\
-                        D=A\n\
-                        @SP\n\
-                        M=M+1\n\
-                        A=M-1\n\
-                        M=D"
-                    )
+                    format!("@{number}\nD=A\n{}", push_d("SP"))
                 } else {
                     todo!()
                 }
@@ -110,12 +102,16 @@ M=0
         )
 }
 
+fn push_d(p_name: &str) -> String {
+    format!("@{p_name}\nM=M+1\nA=M-1\nM=D")
+}
+
 /// Decrease stack pointer and set A to the popped element
 fn pop(p_name: &str) -> String {
     format!("@{p_name}\nAM=M-1")
 }
 
-/// Pop to D
+/// Pop one element of the stack into D
 fn pop_to_d(p_name: &str) -> String {
     format!("{}\nD=M", pop(p_name))
 }
