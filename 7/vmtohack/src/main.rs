@@ -6,7 +6,7 @@ fn main() {
         panic!("Expect single parameter to `*.vm` file.");
     }
     let filename = args.next_back().unwrap();
-    vm_translate(&Path::new(&filename));
+    vm_translate(Path::new(&filename));
 }
 
 #[cfg(test)]
@@ -46,8 +46,8 @@ mod test {
 
 fn vm_translate(asm_file: &Path) {
     let result_filename = asm_file.with_extension("asm");
-    let asm_file =
-        fs::read_to_string(asm_file).expect(&format!("Couldn't read {}.", asm_file.display()));
+    let asm_file = fs::read_to_string(asm_file)
+        .unwrap_or_else(|_| panic!("Couldn't read {}.", asm_file.display()));
 
     let mut jmp_idx = 0;
     let mut result = trimmed_lines(&asm_file)
@@ -74,14 +74,14 @@ fn vm_translate(asm_file: &Path) {
                 }
             } else {
                 match l {
-                    "add" => format!("{POP_AND_PEEK}\nM=M+D"),
-                    "sub" => format!("{POP_AND_PEEK}\nM=M-D"),
+                    "add" => pop_and_peek("SP") + "\nM=M+D",
+                    "sub" => pop_and_peek("SP") + "\nM=M-D",
                     "neg" => format!("{PEEK}\nM=-M"),
                     "eq" => compare_command("JEQ", &mut jmp_idx),
                     "gt" => compare_command("JGT", &mut jmp_idx),
                     "lt" => compare_command("JLT", &mut jmp_idx),
-                    "and" => format!("{POP_AND_PEEK}\nM=M&D"),
-                    "or" => format!("{POP_AND_PEEK}\nM=M|D"),
+                    "and" => pop_and_peek("SP") + "\nM=M&D",
+                    "or" => pop_and_peek("SP") + "\nM=M|D",
                     "not" => format!("{PEEK}\nM=!M"),
                     _ => panic!("Unexpected expression `{l}`"),
                 }
@@ -96,8 +96,9 @@ fn vm_translate(asm_file: &Path) {
 
 fn compare_command(cmp: &str, jmp_idx: &mut i32) -> String {
     *jmp_idx += 1;
-    format!(
-        r#"{POP_AND_PEEK}
+    pop_and_peek("SP")
+        + &format!(
+            r#"
 D=M-D
 M=-1
 @TRUE{jmp_idx}
@@ -106,16 +107,20 @@ D;{cmp}
 A=M-1
 M=0
 (TRUE{jmp_idx})"#
-    )
+        )
 }
 
 const PEEK: &str = "@SP\nA=M-1";
 
-const POP_AND_PEEK: &str = r#"@SP
+fn pop_and_peek(p_name: &str) -> String {
+    format!(
+        r#"@{p_name}
 AM=M-1
 D=M
-@SP
-A=M-1"#;
+@{p_name}
+A=M-1"#
+    )
+}
 
 fn trimmed_lines(s: &str) -> impl Iterator<Item = &str> {
     s.lines()
