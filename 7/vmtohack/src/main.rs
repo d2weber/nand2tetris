@@ -115,6 +115,11 @@ fn pop(p_name: &str) -> String {
     format!("@{p_name}\nAM=M-1")
 }
 
+/// Pop to D
+fn pop_to_d(p_name: &str) -> String {
+    format!("{}\nD=M", pop(p_name))
+}
+
 /// Set A to the last element on the stack
 fn peek(p_name: &str) -> String {
     format!("@{p_name}\nA=M-1")
@@ -122,8 +127,7 @@ fn peek(p_name: &str) -> String {
 
 /// Pop one element of the stack into D and peek
 fn pop_and_peek(p_name: &str) -> String {
-    let (pop, peek) = (pop(p_name), peek(p_name));
-    format!("{pop}\nD=M\n{peek}")
+    format!("{}\n{}", pop_to_d(p_name), peek(p_name))
 }
 
 fn trimmed_lines(s: &str) -> impl Iterator<Item = &str> {
