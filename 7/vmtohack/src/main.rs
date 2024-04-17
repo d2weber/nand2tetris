@@ -6,44 +6,46 @@ fn main() {
         panic!("Expect single parameter to `*.vm` file.");
     }
     let filename = args.next_back().unwrap();
-    let result = vm_translate(&Path::new(&filename));
-
-    // I prefer to print to stdout, users can easily pipe to a file
-    print!("{result}");
+    vm_translate(&Path::new(&filename));
 }
 
 #[cfg(test)]
 mod test {
+    use std::process::{Command, Stdio};
+
     use super::*;
 
     #[test]
     fn simple_add() {
-        let result = vm_translate(&Path::new("../StackArithmetic/SimpleAdd/SimpleAdd.vm"));
-        assert_eq!(
-            result,
-            concat!(
-                "@7\nD=A\n@SP\nM=M+1\nA=M-1\nM=D\n",
-                "@8\nD=A\n@SP\nM=M+1\nA=M-1\nM=D\n",
-                "@SP\nAM=M-1\nD=M\n@SP\nA=M-1\nM=M+D\n"
-            )
-        );
+        check_tst("../StackArithmetic/SimpleAdd/SimpleAdd.vm");
     }
 
     #[test]
     fn stack_test() {
-        let result = vm_translate(&Path::new("../StackArithmetic/StackTest/StackTest.vm"));
-        assert_eq!(
-            result,
-            concat!(
-                "@7\nD=A\n@SP\nM=M+1\nA=M-1\nM=D\n",
-                "@8\nD=A\n@SP\nM=M+1\nA=M-1\nM=D\n",
-                "@SP\nAM=M-1\nD=M\n@SP\nA=M-1\nM=M+D\n"
-            )
+        check_tst("../StackArithmetic/StackTest/StackTest.vm");
+    }
+
+    /// Compile provided vm file to asm, and check result with a `*.tst` file
+    fn check_tst(vm_file: &str) {
+        let cargo_root = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let vm_file = cargo_root.join(vm_file);
+        vm_translate(&vm_file);
+        assert!(
+            Command::new("bash")
+                .arg("../../../tools/CPUEmulator.sh")
+                .arg(vm_file.with_extension("tst"))
+                .current_dir(cargo_root)
+                .stdout(Stdio::null())
+                .status()
+                .expect("Failed to run CPUEmulator")
+                .success(),
+            "Bad status when running CPUEmulator"
         );
     }
 }
 
-fn vm_translate(asm_file: &Path) -> String {
+fn vm_translate(asm_file: &Path) {
+    let result_filename = asm_file.with_extension("asm");
     let asm_file =
         fs::read_to_string(asm_file).expect(&format!("Couldn't read {}.", asm_file.display()));
 
@@ -89,7 +91,7 @@ fn vm_translate(asm_file: &Path) -> String {
         .join("\n");
 
     result.push('\n');
-    result
+    fs::write(result_filename, result).expect("Failed writing assembly file.");
 }
 
 fn compare_command(cmp: &str, jmp_idx: &mut i32) -> String {
