@@ -30,6 +30,16 @@ mod test {
         check_tst("../MemoryAccess/BasicTest/BasicTest.vm");
     }
 
+    #[test]
+    fn pointer_test() {
+        check_tst("../MemoryAccess/PointerTest/PointerTest.vm");
+    }
+
+    #[test]
+    fn static_test() {
+        check_tst("../MemoryAccess/StaticTest/StaticTest.vm");
+    }
+
     /// Compile provided vm file to asm, and check result with a `*.tst` file
     fn check_tst(vm_file: &str) {
         let cargo_root = Path::new(env!("CARGO_MANIFEST_DIR"));
@@ -50,6 +60,11 @@ mod test {
 }
 
 fn vm_translate(asm_file: &Path) {
+    let module_id = asm_file
+        .file_stem()
+        .unwrap_or_else(|| panic!("Expected *.asm file, got `{}`", asm_file.display()))
+        .to_str()
+        .expect("Filename has to be unicode.");
     let result_filename = asm_file.with_extension("asm");
     let asm_file = fs::read_to_string(asm_file)
         .unwrap_or_else(|_| panic!("Couldn't read {}.", asm_file.display()));
@@ -84,12 +99,28 @@ fn vm_translate(asm_file: &Path) {
                         ("push", "argument") => read_to_d("ARG", offset) + "\n" + &push_d("SP"),
                         ("push", "this") => read_to_d("THIS", offset) + "\n" + &push_d("SP"),
                         ("push", "that") => read_to_d("THAT", offset) + "\n" + &push_d("SP"),
-                        ("push", "temp") => read_tmp(offset) + "\n" + &push_d("SP"),
+                        ("push", "temp") => read(offset + 5) + "\n" + &push_d("SP"),
                         ("pop", "local") => write_from_d("LCL", offset),
                         ("pop", "argument") => write_from_d("ARG", offset),
                         ("pop", "this") => write_from_d("THIS", offset),
                         ("pop", "that") => write_from_d("THAT", offset),
-                        ("pop", "temp") => write_tmp(offset),
+                        ("pop", "temp") => write(offset + 5),
+                        ("push", "pointer") => match offset {
+                            0 => format!("@THIS\nD=M\n{}", push_d("SP")),
+                            1 => format!("@THAT\nD=M\n{}", push_d("SP")),
+                            _ => panic!("Cannot {operation} to pointer `{offset}`"),
+                        },
+                        ("pop", "pointer") => match offset {
+                            0 => format!("{}\n@THIS\nM=D", pop_to_d("SP")),
+                            1 => format!("{}\n@THAT\nM=D", pop_to_d("SP")),
+                            _ => panic!("Cannot {operation} to pointer `{offset}`"),
+                        },
+                        ("push", "static") => {
+                            format!("@{module_id}.{offset}\nD=M\n{}", push_d("SP"))
+                        }
+                        ("pop", "static") => {
+                            format!("{pop}\n@{module_id}.{offset}\nM=D", pop = pop_to_d("SP"))
+                        }
                         _ => panic!("Cannot {operation} from `{namespace}`"),
                     }
                 }
@@ -120,8 +151,7 @@ M=0
         )
 }
 
-fn read_tmp(mut offset: usize) -> String {
-    offset += 5;
+fn read(offset: usize) -> String {
     format!("@{offset}\nD=M")
 }
 
@@ -136,8 +166,7 @@ D=M"#
     )
 }
 
-fn write_tmp(mut offset: usize) -> String {
-    offset += 5;
+fn write(offset: usize) -> String {
     let pop = pop_to_d("SP");
     format!("{pop}\n@{offset}\nM=D")
 }
