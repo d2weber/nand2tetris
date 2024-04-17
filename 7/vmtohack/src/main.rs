@@ -25,6 +25,11 @@ mod test {
         check_tst("../StackArithmetic/StackTest/StackTest.vm");
     }
 
+    #[test]
+    fn basic_test() {
+        check_tst("../MemoryAccess/BasicTest/BasicTest.vm");
+    }
+
     /// Compile provided vm file to asm, and check result with a `*.tst` file
     fn check_tst(vm_file: &str) {
         let cargo_root = Path::new(env!("CARGO_MANIFEST_DIR"));
@@ -52,31 +57,43 @@ fn vm_translate(asm_file: &Path) {
     let mut jmp_idx = 0;
     let mut result = trimmed_lines(&asm_file)
         .map(|l| {
-            if let Some(l) = l.strip_prefix("push ") {
-                if let Some(number) = l.strip_prefix("constant ") {
-                    let number: i32 = number.parse().unwrap_or_else(|_| {
-                        panic!(
-                            "Got `{number}`, but expected number literal when pushing a constant."
-                        )
-                    });
-
-                    format!("@{number}\nD=A\n{}", push_d("SP"))
-                } else {
-                    todo!()
+            let mut parts = l.split_whitespace();
+            let operation = parts.next().expect("Empty lines have been filtered out");
+            match operation {
+                "add" => pop_and_peek("SP") + "\nM=M+D",
+                "sub" => pop_and_peek("SP") + "\nM=M-D",
+                "neg" => peek("SP") + "\nM=-M",
+                "eq" => compare_command("JEQ", &mut jmp_idx),
+                "gt" => compare_command("JGT", &mut jmp_idx),
+                "lt" => compare_command("JLT", &mut jmp_idx),
+                "and" => pop_and_peek("SP") + "\nM=M&D",
+                "or" => pop_and_peek("SP") + "\nM=M|D",
+                "not" => peek("SP") + "\nM=!M",
+                "push" | "pop" => {
+                    let namespace = parts
+                        .next()
+                        .unwrap_or_else(|| panic!("Missing kind after pop: `{l}`"));
+                    let offset: usize = parts
+                        .next()
+                        .unwrap_or_else(|| panic!("Missing number after pop: `{l}`"))
+                        .parse()
+                        .unwrap_or_else(|_| panic!("Could not parse number in `{l}`"));
+                    match (operation, namespace) {
+                        ("push", "constant") => format!("@{offset}\nD=A\n{}", push_d("SP")),
+                        ("push", "local") => read_to_d("LCL", offset) + &push_d("SP"),
+                        ("push", "argument") => read_to_d("ARG", offset) + &push_d("SP"),
+                        ("push", "this") => read_to_d("THIS", offset) + &push_d("SP"),
+                        ("push", "that") => read_to_d("THAT", offset) + &push_d("SP"),
+                        ("push", "temp") => read_to_d("5", offset) + &push_d("SP"), // TODO: optimize
+                        ("pop", "local") => read_to_d("LCL", offset) + &push_d("SP"),
+                        ("pop", "argument") => read_to_d("ARG", offset) + &push_d("SP"),
+                        ("pop", "this") => read_to_d("THIS", offset) + &push_d("SP"),
+                        ("pop", "that") => read_to_d("THAT", offset) + &push_d("SP"),
+                        ("pop", "temp") => read_to_d("5", offset) + &push_d("SP"), // TODO: optimize
+                        _ => panic!("Cannot {operation} to `{namespace}`"),
+                    }
                 }
-            } else {
-                match l {
-                    "add" => pop_and_peek("SP") + "\nM=M+D",
-                    "sub" => pop_and_peek("SP") + "\nM=M-D",
-                    "neg" => peek("SP") + "\nM=-M",
-                    "eq" => compare_command("JEQ", &mut jmp_idx),
-                    "gt" => compare_command("JGT", &mut jmp_idx),
-                    "lt" => compare_command("JLT", &mut jmp_idx),
-                    "and" => pop_and_peek("SP") + "\nM=M&D",
-                    "or" => pop_and_peek("SP") + "\nM=M|D",
-                    "not" => peek("SP") + "\nM=!M",
-                    _ => panic!("Unexpected expression `{l}`"),
-                }
+                _ => panic!("Unexpected expression `{l}`"),
             }
         })
         .collect::<Vec<String>>()
@@ -100,6 +117,17 @@ A=M-1
 M=0
 (TRUE{jmp_idx})"#
         )
+}
+
+fn read_to_d(p_name: &str, offset: usize) -> String {
+    format!(
+        // TODO: optimize for offset=0 and offset=1
+        r#"@{offset}
+D=A
+@{p_name}
+A=A+D
+D=M"#
+    )
 }
 
 fn push_d(p_name: &str) -> String {
