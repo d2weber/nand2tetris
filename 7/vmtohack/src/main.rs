@@ -76,13 +76,13 @@ fn vm_translate(asm_file: &Path) {
                 match l {
                     "add" => pop_and_peek("SP") + "\nM=M+D",
                     "sub" => pop_and_peek("SP") + "\nM=M-D",
-                    "neg" => format!("{PEEK}\nM=-M"),
+                    "neg" => peek("SP") + "\nM=-M",
                     "eq" => compare_command("JEQ", &mut jmp_idx),
                     "gt" => compare_command("JGT", &mut jmp_idx),
                     "lt" => compare_command("JLT", &mut jmp_idx),
                     "and" => pop_and_peek("SP") + "\nM=M&D",
                     "or" => pop_and_peek("SP") + "\nM=M|D",
-                    "not" => format!("{PEEK}\nM=!M"),
+                    "not" => peek("SP") + "\nM=!M",
                     _ => panic!("Unexpected expression `{l}`"),
                 }
             }
@@ -110,7 +110,9 @@ M=0
         )
 }
 
-const PEEK: &str = "@SP\nA=M-1";
+fn peek(p_name: &str) -> String {
+    format!("@{p_name}\nA=M-1")
+}
 
 fn pop_and_peek(p_name: &str) -> String {
     format!(
