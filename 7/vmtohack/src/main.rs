@@ -1,4 +1,4 @@
-use std::{env, fs, path::Path};
+use std::{env, fmt::Display, fs, path::Path};
 
 fn main() {
     let mut args = env::args();
@@ -75,54 +75,25 @@ fn vm_translate(asm_file: &Path) {
             let mut parts = l.split_whitespace();
             let operation = parts.next().expect("Empty lines have been filtered out");
             let asm = match operation {
-                "add" => pop_and_peek("SP") + "\nM=M+D",
-                "sub" => pop_and_peek("SP") + "\nM=M-D",
-                "neg" => peek("SP") + "\nM=-M",
+                "add" => pop_d() + "\n" + &peek() + "\nM=M+D",
+                "sub" => pop_d() + "\n" + &peek() + "\nM=M-D",
+                "neg" => peek() + "\nM=-M",
                 "eq" => compare_command("JEQ", &mut jmp_idx),
                 "gt" => compare_command("JGT", &mut jmp_idx),
                 "lt" => compare_command("JLT", &mut jmp_idx),
-                "and" => pop_and_peek("SP") + "\nM=M&D",
-                "or" => pop_and_peek("SP") + "\nM=M|D",
-                "not" => peek("SP") + "\nM=!M",
+                "and" => pop_d() + "\n" + &peek() + "\nM=M&D",
+                "or" => pop_d() + "\n" + &peek() + "\nM=M|D",
+                "not" => peek() + "\nM=!M",
                 "push" | "pop" => {
-                    let namespace = parts
+                    let kind = parts
                         .next()
-                        .unwrap_or_else(|| panic!("Missing kind after pop: `{l}`"));
+                        .unwrap_or_else(|| panic!("Missing kind after {operation}: `{l}`"));
                     let offset: usize = parts
                         .next()
-                        .unwrap_or_else(|| panic!("Missing number after pop: `{l}`"))
+                        .unwrap_or_else(|| panic!("Missing number after {operation}: `{l}`"))
                         .parse()
                         .unwrap_or_else(|_| panic!("Could not parse number in `{l}`"));
-                    match (operation, namespace) {
-                        ("push", "constant") => format!("@{offset}\nD=A\n{}", push_d("SP")),
-                        ("push", "local") => read_to_d("LCL", offset) + "\n" + &push_d("SP"),
-                        ("push", "argument") => read_to_d("ARG", offset) + "\n" + &push_d("SP"),
-                        ("push", "this") => read_to_d("THIS", offset) + "\n" + &push_d("SP"),
-                        ("push", "that") => read_to_d("THAT", offset) + "\n" + &push_d("SP"),
-                        ("push", "temp") => read(offset + 5) + "\n" + &push_d("SP"),
-                        ("pop", "local") => write_from_d("LCL", offset),
-                        ("pop", "argument") => write_from_d("ARG", offset),
-                        ("pop", "this") => write_from_d("THIS", offset),
-                        ("pop", "that") => write_from_d("THAT", offset),
-                        ("pop", "temp") => write(offset + 5),
-                        ("push", "pointer") => match offset {
-                            0 => format!("@THIS\nD=M\n{}", push_d("SP")),
-                            1 => format!("@THAT\nD=M\n{}", push_d("SP")),
-                            _ => panic!("Cannot {operation} to pointer `{offset}`"),
-                        },
-                        ("pop", "pointer") => match offset {
-                            0 => format!("{}\n@THIS\nM=D", pop_to_d("SP")),
-                            1 => format!("{}\n@THAT\nM=D", pop_to_d("SP")),
-                            _ => panic!("Cannot {operation} to pointer `{offset}`"),
-                        },
-                        ("push", "static") => {
-                            format!("@{module_id}.{offset}\nD=M\n{}", push_d("SP"))
-                        }
-                        ("pop", "static") => {
-                            format!("{pop}\n@{module_id}.{offset}\nM=D", pop = pop_to_d("SP"))
-                        }
-                        _ => panic!("Cannot {operation} from `{namespace}`"),
-                    }
+                    push_or_pop(operation, kind, offset, module_id)
                 }
                 _ => panic!("Unexpected expression `{l}`"),
             };
@@ -135,11 +106,48 @@ fn vm_translate(asm_file: &Path) {
     fs::write(result_filename, result).expect("Failed writing assembly file.");
 }
 
+fn push_or_pop(operation: &str, kind: &str, offset: usize, module_id: &str) -> String {
+    match (operation, kind) {
+        ("push", "constant") => format!("@{offset}\nD=A\n{}", push_d()),
+        ("push", "local") => push_from_addr("LCL", offset),
+        ("push", "argument") => push_from_addr("ARG", offset),
+        ("push", "this") => push_from_addr("THIS", offset),
+        ("push", "that") => push_from_addr("THAT", offset),
+        ("push", "temp") => push_to(5 + offset),
+        ("pop", "local") => pop_to_addr("LCL", offset),
+        ("pop", "argument") => pop_to_addr("ARG", offset),
+        ("pop", "this") => pop_to_addr("THIS", offset),
+        ("pop", "that") => pop_to_addr("THAT", offset),
+        ("pop", "temp") => pop_from(5 + offset),
+        ("push", "pointer") => match offset {
+            0 => push_to("THIS"),
+            1 => push_to("THAT"),
+            _ => panic!("Cannot {operation} to pointer `{offset}`"),
+        },
+        ("pop", "pointer") => match offset {
+            0 => pop_from("THIS"),
+            1 => pop_from("THAT"),
+            _ => panic!("Cannot {operation} to pointer `{offset}`"),
+        },
+        ("push", "static") => push_to(format!("{module_id}.{offset}")),
+        ("pop", "static") => pop_from(format!("{module_id}.{offset}")),
+        _ => panic!("Cannot {operation} from `{kind}`"),
+    }
+}
+
+fn pop_from(a_expr: impl Display) -> String {
+    format!("{}\n@{a_expr}\nM=D", pop_d())
+}
+
+fn push_to(a_expr: impl Display) -> String {
+    format!("@{a_expr}\nD=M\n{}", push_d())
+}
+
 fn compare_command(cmp: &str, jmp_idx: &mut i32) -> String {
     *jmp_idx += 1;
-    pop_and_peek("SP")
-        + &format!(
-            r#"
+    format!(
+        r#"{pop_d}
+{peek}
 D=M-D
 M=-1
 @TRUE{jmp_idx}
@@ -147,31 +155,26 @@ D;{cmp}
 @SP
 A=M-1
 M=0
-(TRUE{jmp_idx})"#
-        )
+(TRUE{jmp_idx})"#,
+        pop_d = pop_d(),
+        peek = peek()
+    )
 }
 
-fn read(offset: usize) -> String {
-    format!("@{offset}\nD=M")
-}
-
-fn read_to_d(p_name: &str, offset: usize) -> String {
+fn push_from_addr(p_name: &str, offset: usize) -> String {
     format!(
         // TODO: optimize for offset=0 and offset=1
         r#"@{offset}
 D=A
 @{p_name}
 A=M+D
-D=M"#
+D=M
+{push_d}"#,
+        push_d = push_d()
     )
 }
 
-fn write(offset: usize) -> String {
-    let pop = pop_to_d("SP");
-    format!("{pop}\n@{offset}\nM=D")
-}
-
-fn write_from_d(p_name: &str, offset: usize) -> String {
+fn pop_to_addr(p_name: &str, offset: usize) -> String {
     format!(
         // TODO: optimize for offset=0 and offset=1
         r#"@{offset}
@@ -189,28 +192,19 @@ M=D"#
     )
 }
 
-fn push_d(p_name: &str) -> String {
-    format!("@{p_name}\nM=M+1\nA=M-1\nM=D")
+/// Push D on the stack
+fn push_d() -> String {
+    "@SP\nM=M+1\nA=M-1\nM=D".to_owned()
 }
 
-/// Decrease stack pointer and set A to the popped element
-fn pop(p_name: &str) -> String {
-    format!("@{p_name}\nAM=M-1")
-}
-
-/// Pop one element of the stack into D
-fn pop_to_d(p_name: &str) -> String {
-    format!("{}\nD=M", pop(p_name))
+/// Pop one element from the stack to D
+fn pop_d() -> String {
+    "@SP\nAM=M-1\nD=M".to_owned()
 }
 
 /// Set A to the last element on the stack
-fn peek(p_name: &str) -> String {
-    format!("@{p_name}\nA=M-1")
-}
-
-/// Pop one element of the stack into D and peek
-fn pop_and_peek(p_name: &str) -> String {
-    format!("{}\n{}", pop_to_d(p_name), peek(p_name))
+fn peek() -> String {
+    "@SP\nA=M-1".to_owned()
 }
 
 fn trimmed_lines(s: &str) -> impl Iterator<Item = &str> {
