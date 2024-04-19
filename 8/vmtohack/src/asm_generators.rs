@@ -77,7 +77,7 @@ pub fn zero_local(nvars: usize) -> String {
     if nvars == 0 {
         return result;
     }
-    result += "\n@LCL\nA=M\nM=0";
+    result += &format!("\n@{nvars}\nD=A\n@SP\nM=M+D\n@LCL\nA=M\nM=0");
     for _ in 1..nvars {
         result += "\nA=A+1\nM=0"
     }
@@ -85,12 +85,8 @@ pub fn zero_local(nvars: usize) -> String {
 }
 
 pub fn return_asm() -> String {
-    pop_d()
-        + r#"
-@ARG // Return value
-A=M
-M=D
-@LCL // Store LCL in R13
+    format!(
+        r#"@LCL // Store LCL in R13
 D=M
 @R13
 M=D
@@ -98,6 +94,10 @@ M=D
 A=D-A
 D=M
 @R12
+M=D
+{pop_d} // Return value
+@ARG
+A=M
 M=D
 @ARG // Reposition SP
 D=M+1
@@ -125,7 +125,9 @@ D=M
 M=D
 @R12 // get retAddr
 A=M
-0;JMP"#
+0;JMP"#,
+        pop_d = pop_d()
+    )
 }
 
 pub fn call_asm(name: &str, nargs: usize, return_label: &str) -> String {

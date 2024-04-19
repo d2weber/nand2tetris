@@ -75,6 +75,11 @@ mod test {
         test_dir("../FunctionCalls/FibonacciElement/");
     }
 
+    #[test]
+    fn nested_call() {
+        test_dir("../FunctionCalls/NestedCall/");
+    }
+
     fn test_file(vm_file: &str) {
         let vm_file = Path::new(vm_file);
         test_path(vm_file, &vm_file.with_extension("tst"));
