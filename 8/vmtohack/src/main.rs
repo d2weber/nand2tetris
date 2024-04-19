@@ -1,4 +1,4 @@
-use std::{env, fmt::Display, fs, path::Path};
+use std::{env, fmt::Display, fs, path::Path, str::FromStr};
 
 fn main() {
     let mut args = env::args();
@@ -72,30 +72,21 @@ fn vm_translate(asm_file: &Path) {
     let mut jmp_idx = 0;
     let mut result = trimmed_lines(&asm_file)
         .map(|l| {
-            let mut parts = l.split_whitespace();
-            let operation = parts.next().expect("Empty lines have been filtered out");
-            let asm = match operation {
-                "add" => pop_d() + "\n" + &peek() + "\nM=M+D",
-                "sub" => pop_d() + "\n" + &peek() + "\nM=M-D",
-                "neg" => peek() + "\nM=-M",
-                "eq" => compare_command("JEQ", &mut jmp_idx),
-                "gt" => compare_command("JGT", &mut jmp_idx),
-                "lt" => compare_command("JLT", &mut jmp_idx),
-                "and" => pop_d() + "\n" + &peek() + "\nM=M&D",
-                "or" => pop_d() + "\n" + &peek() + "\nM=M|D",
-                "not" => peek() + "\nM=!M",
-                "push" | "pop" => {
-                    let kind = parts
-                        .next()
-                        .unwrap_or_else(|| panic!("Missing kind after {operation}: `{l}`"));
-                    let offset: usize = parts
-                        .next()
-                        .unwrap_or_else(|| panic!("Missing number after {operation}: `{l}`"))
-                        .parse()
-                        .unwrap_or_else(|_| panic!("Could not parse number in `{l}`"));
-                    push_or_pop(operation, kind, offset, module_id)
-                }
-                _ => panic!("Unexpected expression `{l}`"),
+            let o = l
+                .parse()
+                .unwrap_or_else(|e| panic!("Error parsing `{l}`: {}", e));
+            let asm = match o {
+                VmCommand::Add => pop_d() + "\n" + &peek() + "\nM=M+D",
+                VmCommand::Sub => pop_d() + "\n" + &peek() + "\nM=M-D",
+                VmCommand::Neg => peek() + "\nM=-M",
+                VmCommand::Eq => compare_command("JEQ", &mut jmp_idx),
+                VmCommand::Gt => compare_command("JGT", &mut jmp_idx),
+                VmCommand::Lt => compare_command("JLT", &mut jmp_idx),
+                VmCommand::And => pop_d() + "\n" + &peek() + "\nM=M&D",
+                VmCommand::Or => pop_d() + "\n" + &peek() + "\nM=M|D",
+                VmCommand::Not => peek() + "\nM=!M",
+                VmCommand::Push(k) => k.push(module_id),
+                VmCommand::Pop(k) => k.pop(module_id),
             };
             format!("// {l}\n{asm}")
         })
@@ -106,33 +97,65 @@ fn vm_translate(asm_file: &Path) {
     fs::write(result_filename, result).expect("Failed writing assembly file.");
 }
 
-fn push_or_pop(operation: &str, kind: &str, offset: usize, module_id: &str) -> String {
-    match (operation, kind) {
-        ("push", "constant") => format!("@{offset}\nD=A\n{}", push_d()),
-        ("push", "local") => push_from_addr("LCL", offset),
-        ("push", "argument") => push_from_addr("ARG", offset),
-        ("push", "this") => push_from_addr("THIS", offset),
-        ("push", "that") => push_from_addr("THAT", offset),
-        ("push", "temp") => push_to(5 + offset),
-        ("pop", "local") => pop_to_addr("LCL", offset),
-        ("pop", "argument") => pop_to_addr("ARG", offset),
-        ("pop", "this") => pop_to_addr("THIS", offset),
-        ("pop", "that") => pop_to_addr("THAT", offset),
-        ("pop", "temp") => pop_from(5 + offset),
-        ("push", "pointer") => match offset {
-            0 => push_to("THIS"),
-            1 => push_to("THAT"),
-            _ => panic!("Cannot {operation} to pointer `{offset}`"),
-        },
-        ("pop", "pointer") => match offset {
-            0 => pop_from("THIS"),
-            1 => pop_from("THAT"),
-            _ => panic!("Cannot {operation} to pointer `{offset}`"),
-        },
-        ("push", "static") => push_to(format!("{module_id}.{offset}")),
-        ("pop", "static") => pop_from(format!("{module_id}.{offset}")),
-        _ => panic!("Cannot {operation} from `{kind}`"),
+impl MemoryLocation {
+    fn push(&self, module_id: &str) -> String {
+        match self {
+            MemoryLocation::Constant(number) => format!("@{number}\nD=A\n{}", push_d()),
+            MemoryLocation::Local(offset) => push_from_addr("LCL", *offset),
+            MemoryLocation::Argument(offset) => push_from_addr("ARG", *offset),
+            MemoryLocation::This(offset) => push_from_addr("THIS", *offset),
+            MemoryLocation::That(offset) => push_from_addr("THAT", *offset),
+            MemoryLocation::Temp(offset) => push_to(5 + offset),
+            MemoryLocation::Pointer(id) => push_to(pointer_name(id)),
+            MemoryLocation::Static(id) => push_to(format!("{module_id}.{id}")),
+        }
     }
+
+    fn pop(&self, module_id: &str) -> String {
+        match self {
+            MemoryLocation::Constant(_) => panic!("Cannot pop constant"),
+            MemoryLocation::Local(offset) => pop_to_addr("LCL", *offset),
+            MemoryLocation::Argument(offset) => pop_to_addr("ARG", *offset),
+            MemoryLocation::This(offset) => pop_to_addr("THIS", *offset),
+            MemoryLocation::That(offset) => pop_to_addr("THAT", *offset),
+            MemoryLocation::Temp(offset) => pop_from(5 + offset),
+            MemoryLocation::Pointer(id) => pop_from(pointer_name(id)),
+            MemoryLocation::Static(id) => pop_from(format!("{module_id}.{id}")),
+        }
+    }
+}
+
+fn pointer_name(pointer_id: &usize) -> &str {
+    match pointer_id {
+        0 => "THIS",
+        1 => "THAT",
+        _ => panic!("Invalid pointer id `{pointer_id}`"),
+    }
+}
+
+enum VmCommand {
+    Add,
+    Sub,
+    Neg,
+    Eq,
+    Gt,
+    Lt,
+    And,
+    Or,
+    Not,
+    Push(MemoryLocation),
+    Pop(MemoryLocation),
+}
+
+enum MemoryLocation {
+    Constant(usize),
+    Local(usize),
+    Argument(usize),
+    This(usize),
+    That(usize),
+    Temp(usize),
+    Pointer(usize),
+    Static(usize),
 }
 
 fn pop_from(a_expr: impl Display) -> String {
@@ -218,5 +241,53 @@ fn strip_comment(s: &str) -> &str {
         content
     } else {
         s
+    }
+}
+impl FromStr for VmCommand {
+    type Err = &'static str;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut parts = s.split_whitespace();
+        let operation = parts.next().expect("Cannot parse empty string");
+        let operation = match operation {
+            "add" => VmCommand::Add,
+            "sub" => VmCommand::Sub,
+            "neg" => VmCommand::Neg,
+            "eq" => VmCommand::Eq,
+            "gt" => VmCommand::Gt,
+            "lt" => VmCommand::Lt,
+            "and" => VmCommand::And,
+            "or" => VmCommand::Or,
+            "not" => VmCommand::Not,
+            "push" => VmCommand::Push(MemoryLocation::from(&mut parts)?),
+            "pop" => VmCommand::Pop(MemoryLocation::from(&mut parts)?),
+            _ => return Err("Unexpected expression"),
+        };
+        if let Some(_) = parts.next() {
+            return Err("Spurious element after command");
+        }
+        Ok(operation)
+    }
+}
+
+impl MemoryLocation {
+    fn from<'a>(parts: &mut impl Iterator<Item = &'a str>) -> Result<Self, &'static str> {
+        let kind = parts.next().ok_or("Missing kind")?;
+        let number: usize = parts
+            .next()
+            .ok_or("Missing number")?
+            .parse()
+            .map_err(|_| "Could not parse number")?;
+        Ok(match kind {
+            "constant" => MemoryLocation::Constant(number),
+            "local" => MemoryLocation::Local(number),
+            "argument" => MemoryLocation::Argument(number),
+            "this" => MemoryLocation::This(number),
+            "that" => MemoryLocation::That(number),
+            "temp" => MemoryLocation::Temp(number),
+            "pointer" => MemoryLocation::Pointer(number),
+            "static" => MemoryLocation::Static(number),
+            _ => return Err("Invalid kind"),
+        })
     }
 }
