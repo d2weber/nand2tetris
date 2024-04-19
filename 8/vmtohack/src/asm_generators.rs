@@ -77,7 +77,7 @@ pub fn zero_local(nvars: usize) -> String {
     if nvars == 0 {
         return result;
     }
-    result += "@LCL\nA=M\nM=0";
+    result += "\n@LCL\nA=M\nM=0";
     for _ in 1..nvars {
         result += "\nA=A+1\nM=0"
     }
@@ -129,37 +129,36 @@ A=M
 }
 
 pub fn call_asm(name: &str, nargs: usize, return_label: &str) -> String {
-    let offset = i32::try_from(nargs).unwrap() - 5;
+    let offset = nargs + 5;
     format!(
-        r#"
-        @{return_label} // Push return label on stack
-        D=A
-        {push_d}
-        @LCL // Push caller stuff to stack
-        D=M
-        {push_d}
-        @ARG
-        D=M
-        {push_d}
-        @THIS
-        D=M
-        {push_d}
-        @THAT
-        D=M
-        {push_d}
-        @SP // Reposition ARG
-        D=M
-        @{offset}
-        D=D-A
-        @ARG
-        M=D
-        @SP // Reposition LCL
-        D=M
-        @LCL
-        M=D
-        @{name} // Transfer controll to callee
-        0;JMP
-        ({return_label})"#,
+        r#"@{return_label} // Push return label on stack
+D=A
+{push_d}
+@LCL // Push caller stuff to stack
+D=M
+{push_d}
+@ARG
+D=M
+{push_d}
+@THIS
+D=M
+{push_d}
+@THAT
+D=M
+{push_d}
+@SP // Reposition ARG
+D=M
+@{offset}
+D=D-A
+@ARG
+M=D
+@SP // Reposition LCL
+D=M
+@LCL
+M=D
+@{name} // Transfer controll to callee
+0;JMP
+({return_label})"#,
         push_d = push_d()
     )
 }

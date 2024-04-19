@@ -31,59 +31,70 @@ mod test {
         use super::*;
         #[test]
         fn simple_add() {
-            check_tst("../../7/StackArithmetic/SimpleAdd/SimpleAdd.vm");
+            test_file("../../7/StackArithmetic/SimpleAdd/SimpleAdd.vm");
         }
 
         #[test]
         fn stack_test() {
-            check_tst("../../7/StackArithmetic/StackTest/StackTest.vm");
+            test_file("../../7/StackArithmetic/StackTest/StackTest.vm");
         }
 
         #[test]
         fn basic_test() {
-            check_tst("../../7/MemoryAccess/BasicTest/BasicTest.vm");
+            test_file("../../7/MemoryAccess/BasicTest/BasicTest.vm");
         }
 
         #[test]
         fn pointer_test() {
-            check_tst("../../7/MemoryAccess/PointerTest/PointerTest.vm");
+            test_file("../../7/MemoryAccess/PointerTest/PointerTest.vm");
         }
 
         #[test]
         fn static_test() {
-            check_tst("../../7/MemoryAccess/StaticTest/StaticTest.vm");
+            test_file("../../7/MemoryAccess/StaticTest/StaticTest.vm");
         }
     }
 
     #[test]
     fn basic_loop() {
-        check_tst("../ProgramFlow/BasicLoop/BasicLoop.vm")
+        test_file("../ProgramFlow/BasicLoop/BasicLoop.vm")
     }
 
     #[test]
     fn fibonacci_series() {
-        check_tst("../ProgramFlow/FibonacciSeries/FibonacciSeries.vm")
+        test_file("../ProgramFlow/FibonacciSeries/FibonacciSeries.vm")
     }
 
     #[test]
     fn simple_function() {
-        check_tst("../FunctionCalls/SimpleFunction/SimpleFunction.vm")
+        test_file("../FunctionCalls/SimpleFunction/SimpleFunction.vm")
     }
 
     #[test]
     fn fibonacci_element() {
-        check_tst("../FunctionCalls/FibonacciElement/");
+        test_dir("../FunctionCalls/FibonacciElement/");
+    }
+
+    fn test_file(vm_file: &str) {
+        let vm_file = Path::new(vm_file);
+        test_path(vm_file, &vm_file.with_extension("tst"));
+    }
+
+    fn test_dir(dir: &str) {
+        let dir = Path::new(dir);
+        let dir_name = dir.file_name().unwrap();
+        test_path(dir, &dir.join(dir_name).with_extension("tst"));
     }
 
     /// Compile provided vm file to asm, and check result with a `*.tst` file
-    fn check_tst(vm_file: &str) {
+    fn test_path(path: &Path, tst_file_path: &Path) {
         let cargo_root = Path::new(env!("CARGO_MANIFEST_DIR"));
-        let vm_file = cargo_root.join(vm_file);
-        compile_path(&vm_file).unwrap();
+        let path = cargo_root.join(path);
+        compile_path(&path).unwrap();
         assert!(
             Command::new("bash")
                 .arg("../../../tools/CPUEmulator.sh")
-                .arg(vm_file.with_extension("tst"))
+                .arg(tst_file_path)
                 .current_dir(cargo_root)
                 .stdout(Stdio::null())
                 .status()
@@ -94,19 +105,19 @@ mod test {
     }
 }
 
-fn compile_path(compile_path: &Path) -> std::io::Result<()> {
-    if compile_path.is_file() {
-        let mut out = BufWriter::new(File::open(compile_path.with_extension("asm"))?);
-        compile_file(compile_path, &mut out);
+fn compile_path(path: &Path) -> std::io::Result<()> {
+    if path.is_file() {
+        let mut out = BufWriter::new(File::open(path.with_extension("asm"))?);
+        compile_file(path, &mut out);
         Ok(())
-    } else if compile_path.is_dir() {
-        let name = compile_path
+    } else if path.is_dir() {
+        let name = path
             .file_name()
             .expect("Already checked that it's a directory");
-        let asm_file = compile_path.join(name).with_extension("asm");
+        let asm_file = path.join(name).with_extension("asm");
         let mut out = BufWriter::new(File::create(asm_file)?);
         // TODO: Error when no vm file is found
-        for dir_entry in fs::read_dir(compile_path)? {
+        for dir_entry in fs::read_dir(path)? {
             let file = dir_entry?.path();
             if file.extension().is_some_and(|e| e == "vm") {
                 compile_file(&file, &mut out)
@@ -127,6 +138,14 @@ fn compile_file(vm_file: &Path, out: &mut impl Write) {
     let asm_file = fs::read_to_string(vm_file)
         .unwrap_or_else(|_| panic!("Couldn't read {}.", vm_file.display()));
 
+    out.write_all(
+        format!(
+            "@256\nD=A\n@SP\nM=D\n{}\n0;JMP\n",
+            call_asm(&"Sys.init", 0, "Sys.init$ret.0")
+        )
+        .as_bytes(),
+    )
+    .unwrap_or_else(|_| panic!("Error writing {module_id}"));
     let mut jmp_idx = 0;
     let mut return_function_idx = 0..;
     let mut current_function = "root".to_owned();
@@ -147,19 +166,19 @@ fn compile_file(vm_file: &Path, out: &mut impl Write) {
                 VmCommand::Not => peek() + "\nM=!M",
                 VmCommand::Push(k) => k.push(module_id),
                 VmCommand::Pop(k) => k.pop(module_id),
-                VmCommand::Label(label) => format!("({module_id}.{current_function}${label})"),
-                VmCommand::Goto(label) => format!("@{module_id}.{current_function}${label}\n0;JMP"),
+                VmCommand::Label(label) => format!("({current_function}${label})"),
+                VmCommand::Goto(label) => format!("@{current_function}${label}\n0;JMP"),
                 VmCommand::IfGoto(label) => {
-                    pop_d() + &format!("\n@{module_id}.{current_function}${label}\nD;JNE")
+                    pop_d() + &format!("\n@{current_function}${label}\nD;JNE")
                 }
                 VmCommand::Function(name, nvars) => {
                     current_function = name;
-                    format!("({module_id}.{current_function})\n{}", zero_local(nvars))
+                    format!("({current_function}){}", zero_local(nvars))
                 }
                 VmCommand::Return => return_asm(),
                 VmCommand::Call(name, nargs) => {
                     let idx = return_function_idx.next().unwrap();
-                    let return_label = format!("({module_id}.{current_function}$ret{idx})");
+                    let return_label = format!("{current_function}$ret.{idx}");
                     call_asm(&name, nargs, &return_label)
                 }
             };
