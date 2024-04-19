@@ -80,6 +80,11 @@ mod test {
         test_dir("../FunctionCalls/NestedCall/");
     }
 
+    #[test]
+    fn static_test() {
+        test_dir("../FunctionCalls/StaticsTest/");
+    }
+
     fn test_file(vm_file: &str) {
         let vm_file = Path::new(vm_file);
         test_path(vm_file, &vm_file.with_extension("tst"));
