@@ -71,3 +71,59 @@ pub fn pop_d() -> String {
 pub fn peek() -> String {
     "@SP\nA=M-1".to_owned()
 }
+
+pub fn zero_local(nvars: usize) -> String {
+    let mut result = String::new();
+    if nvars == 0 {
+        return result;
+    }
+    result += "@LCL\nA=M\nM=0";
+    for _ in 1..nvars {
+        result += "\nA=A+1\nM=0"
+    }
+    result
+}
+
+pub fn return_asm() -> String {
+    pop_d()
+        + r#"
+@ARG // Return value
+A=M
+M=D
+@LCL // Store LCL in R13
+D=M
+@R13
+M=D
+@5 // Store retAddr in R12
+A=D-A
+D=M
+@R12
+M=D
+@ARG // Reposition SP
+D=M+1
+@SP
+M=D
+@R13 // Decrement
+AM=M-1
+D=M
+@THAT
+M=D
+@R13 // Decrement
+AM=M-1
+D=M
+@THIS
+M=D
+@R13 // Decrement
+AM=M-1
+D=M
+@ARG
+M=D
+@R13 // Decrement
+AM=M-1
+D=M
+@LCL
+M=D
+@R12 // get retAddr
+A=M
+0;JMP"#
+}

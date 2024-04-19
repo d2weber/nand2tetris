@@ -59,6 +59,11 @@ mod test {
         check_tst("../ProgramFlow/FibonacciSeries/FibonacciSeries.vm")
     }
 
+    #[test]
+    fn simple_function() {
+        check_tst("../FunctionCalls/SimpleFunction/SimpleFunction.vm")
+    }
+
     /// Compile provided vm file to asm, and check result with a `*.tst` file
     fn check_tst(vm_file: &str) {
         let cargo_root = Path::new(env!("CARGO_MANIFEST_DIR"));
@@ -89,7 +94,7 @@ fn vm_translate(asm_file: &Path) {
         .unwrap_or_else(|_| panic!("Couldn't read {}.", asm_file.display()));
 
     let mut jmp_idx = 0;
-    let current_function = "root".to_owned();
+    let mut current_function = "root".to_owned();
     let mut result = trimmed_lines(&asm_file)
         .map(|l| {
             let o = l
@@ -112,6 +117,11 @@ fn vm_translate(asm_file: &Path) {
                 VmCommand::IfGoto(label) => {
                     pop_d() + &format!("\n@{module_id}.{current_function}${label}\nD;JNE")
                 }
+                VmCommand::Function(name, nvars) => {
+                    current_function = name;
+                    format!("({module_id}.{current_function})\n{}", zero_local(nvars))
+                }
+                VmCommand::Return => return_asm(),
             };
             format!("// {l}\n{asm}")
         })
@@ -137,6 +147,8 @@ enum VmCommand {
     Label(String),
     Goto(String),
     IfGoto(String),
+    Function(String, usize),
+    Return,
 }
 
 impl FromStr for VmCommand {
@@ -160,6 +172,15 @@ impl FromStr for VmCommand {
             "label" => VmCommand::Label(parts.next().ok_or("Missing label name")?.to_owned()),
             "goto" => VmCommand::Goto(parts.next().ok_or("Missing goto label")?.to_owned()),
             "if-goto" => VmCommand::IfGoto(parts.next().ok_or("Missing if-goto label")?.to_owned()),
+            "function" => VmCommand::Function(
+                parts.next().ok_or("Missing function name")?.to_owned(),
+                parts
+                    .next()
+                    .ok_or("Missing nargs for function")?
+                    .parse()
+                    .map_err(|_| "Unable to parse nargs")?,
+            ),
+            "return" => VmCommand::Return,
             _ => return Err("Unexpected expression"),
         };
         if let Some(_) = parts.next() {
