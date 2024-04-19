@@ -4,7 +4,13 @@ mod memory_location;
 use asm_generators::*;
 use memory_location::MemoryLocation;
 
-use std::{env, fs, path::Path, str::FromStr};
+use std::{
+    env,
+    fs::{self, File},
+    io::{BufWriter, Write},
+    path::Path,
+    str::FromStr,
+};
 
 fn main() {
     let mut args = env::args();
@@ -12,7 +18,7 @@ fn main() {
         panic!("Expect single parameter to `*.vm` file.");
     }
     let filename = args.next_back().unwrap();
-    vm_translate(Path::new(&filename));
+    compile_path(Path::new(&filename)).unwrap();
 }
 
 #[cfg(test)]
@@ -64,11 +70,16 @@ mod test {
         check_tst("../FunctionCalls/SimpleFunction/SimpleFunction.vm")
     }
 
+    #[test]
+    fn fibonacci_element() {
+        check_tst("../FunctionCalls/FibonacciElement/");
+    }
+
     /// Compile provided vm file to asm, and check result with a `*.tst` file
     fn check_tst(vm_file: &str) {
         let cargo_root = Path::new(env!("CARGO_MANIFEST_DIR"));
         let vm_file = cargo_root.join(vm_file);
-        vm_translate(&vm_file);
+        compile_path(&vm_file).unwrap();
         assert!(
             Command::new("bash")
                 .arg("../../../tools/CPUEmulator.sh")
@@ -83,15 +94,38 @@ mod test {
     }
 }
 
-fn vm_translate(asm_file: &Path) {
-    let module_id = asm_file
+fn compile_path(compile_path: &Path) -> std::io::Result<()> {
+    if compile_path.is_file() {
+        let mut out = BufWriter::new(File::open(compile_path.with_extension("asm"))?);
+        compile_file(compile_path, &mut out);
+        Ok(())
+    } else if compile_path.is_dir() {
+        let name = compile_path
+            .file_name()
+            .expect("Already checked that it's a directory");
+        let asm_file = compile_path.join(name).with_extension("asm");
+        let mut out = BufWriter::new(File::create(asm_file)?);
+        // TODO: Error when no vm file is found
+        for dir_entry in fs::read_dir(compile_path)? {
+            let file = dir_entry?.path();
+            if file.extension().is_some_and(|e| e == "vm") {
+                compile_file(&file, &mut out)
+            }
+        }
+        Ok(())
+    } else {
+        Err(std::io::ErrorKind::NotFound.into())
+    }
+}
+
+fn compile_file(vm_file: &Path, out: &mut impl Write) {
+    let module_id = vm_file
         .file_stem()
-        .unwrap_or_else(|| panic!("Expected *.asm file, got `{}`", asm_file.display()))
+        .unwrap_or_else(|| panic!("Expected *.vm file, got `{}`", vm_file.display()))
         .to_str()
         .expect("Filename has to be unicode.");
-    let result_filename = asm_file.with_extension("asm");
-    let asm_file = fs::read_to_string(asm_file)
-        .unwrap_or_else(|_| panic!("Couldn't read {}.", asm_file.display()));
+    let asm_file = fs::read_to_string(vm_file)
+        .unwrap_or_else(|_| panic!("Couldn't read {}.", vm_file.display()));
 
     let mut jmp_idx = 0;
     let mut current_function = "root".to_owned();
@@ -129,7 +163,8 @@ fn vm_translate(asm_file: &Path) {
         .join("\n");
 
     result.push('\n');
-    fs::write(result_filename, result).expect("Failed writing assembly file.");
+    out.write_all(result.as_bytes())
+        .expect("Failed to write output file");
 }
 
 enum VmCommand {
