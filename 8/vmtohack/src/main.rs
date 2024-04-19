@@ -17,27 +17,27 @@ mod test {
 
     #[test]
     fn simple_add() {
-        check_tst("../StackArithmetic/SimpleAdd/SimpleAdd.vm");
+        check_tst("../../7/StackArithmetic/SimpleAdd/SimpleAdd.vm");
     }
 
     #[test]
     fn stack_test() {
-        check_tst("../StackArithmetic/StackTest/StackTest.vm");
+        check_tst("../../7/StackArithmetic/StackTest/StackTest.vm");
     }
 
     #[test]
     fn basic_test() {
-        check_tst("../MemoryAccess/BasicTest/BasicTest.vm");
+        check_tst("../../7/MemoryAccess/BasicTest/BasicTest.vm");
     }
 
     #[test]
     fn pointer_test() {
-        check_tst("../MemoryAccess/PointerTest/PointerTest.vm");
+        check_tst("../../7/MemoryAccess/PointerTest/PointerTest.vm");
     }
 
     #[test]
     fn static_test() {
-        check_tst("../MemoryAccess/StaticTest/StaticTest.vm");
+        check_tst("../../7/MemoryAccess/StaticTest/StaticTest.vm");
     }
 
     /// Compile provided vm file to asm, and check result with a `*.tst` file
