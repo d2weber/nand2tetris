@@ -84,6 +84,7 @@ fn vm_translate(asm_file: &Path) {
         .unwrap_or_else(|_| panic!("Couldn't read {}.", asm_file.display()));
 
     let mut jmp_idx = 0;
+    let current_function = "root".to_owned();
     let mut result = trimmed_lines(&asm_file)
         .map(|l| {
             let o = l
@@ -101,6 +102,11 @@ fn vm_translate(asm_file: &Path) {
                 VmCommand::Not => peek() + "\nM=!M",
                 VmCommand::Push(k) => k.push(module_id),
                 VmCommand::Pop(k) => k.pop(module_id),
+                VmCommand::Label(label) => format!("({module_id}.{current_function}${label})"),
+                VmCommand::Goto(label) => format!("@{module_id}.{current_function}${label}\n;jmp"),
+                VmCommand::IfGoto(label) => {
+                    pop_d() + &format!("\n@{module_id}.{current_function}${label}\nD;JNE")
+                }
             };
             format!("// {l}\n{asm}")
         })
@@ -123,6 +129,9 @@ enum VmCommand {
     Not,
     Push(MemoryLocation),
     Pop(MemoryLocation),
+    Label(String),
+    Goto(String),
+    IfGoto(String),
 }
 
 impl FromStr for VmCommand {
@@ -143,6 +152,9 @@ impl FromStr for VmCommand {
             "not" => VmCommand::Not,
             "push" => VmCommand::Push(MemoryLocation::from(&mut parts)?),
             "pop" => VmCommand::Pop(MemoryLocation::from(&mut parts)?),
+            "label" => VmCommand::Label(parts.next().ok_or("Missing label name")?.to_owned()),
+            "goto" => VmCommand::Goto(parts.next().ok_or("Missing goto label")?.to_owned()),
+            "if-goto" => VmCommand::IfGoto(parts.next().ok_or("Missing if-goto label")?.to_owned()),
             _ => return Err("Unexpected expression"),
         };
         if let Some(_) = parts.next() {
