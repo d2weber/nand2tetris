@@ -54,6 +54,11 @@ mod test {
         check_tst("../ProgramFlow/BasicLoop/BasicLoop.vm")
     }
 
+    #[test]
+    fn fibonacci_series() {
+        check_tst("../ProgramFlow/FibonacciSeries/FibonacciSeries.vm")
+    }
+
     /// Compile provided vm file to asm, and check result with a `*.tst` file
     fn check_tst(vm_file: &str) {
         let cargo_root = Path::new(env!("CARGO_MANIFEST_DIR"));
@@ -103,7 +108,7 @@ fn vm_translate(asm_file: &Path) {
                 VmCommand::Push(k) => k.push(module_id),
                 VmCommand::Pop(k) => k.pop(module_id),
                 VmCommand::Label(label) => format!("({module_id}.{current_function}${label})"),
-                VmCommand::Goto(label) => format!("@{module_id}.{current_function}${label}\n;jmp"),
+                VmCommand::Goto(label) => format!("@{module_id}.{current_function}${label}\n0;JMP"),
                 VmCommand::IfGoto(label) => {
                     pop_d() + &format!("\n@{module_id}.{current_function}${label}\nD;JNE")
                 }
