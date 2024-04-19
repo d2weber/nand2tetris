@@ -21,29 +21,37 @@ mod test {
 
     use super::*;
 
-    #[test]
-    fn simple_add() {
-        check_tst("../../7/StackArithmetic/SimpleAdd/SimpleAdd.vm");
+    mod project7 {
+        use super::*;
+        #[test]
+        fn simple_add() {
+            check_tst("../../7/StackArithmetic/SimpleAdd/SimpleAdd.vm");
+        }
+
+        #[test]
+        fn stack_test() {
+            check_tst("../../7/StackArithmetic/StackTest/StackTest.vm");
+        }
+
+        #[test]
+        fn basic_test() {
+            check_tst("../../7/MemoryAccess/BasicTest/BasicTest.vm");
+        }
+
+        #[test]
+        fn pointer_test() {
+            check_tst("../../7/MemoryAccess/PointerTest/PointerTest.vm");
+        }
+
+        #[test]
+        fn static_test() {
+            check_tst("../../7/MemoryAccess/StaticTest/StaticTest.vm");
+        }
     }
 
     #[test]
-    fn stack_test() {
-        check_tst("../../7/StackArithmetic/StackTest/StackTest.vm");
-    }
-
-    #[test]
-    fn basic_test() {
-        check_tst("../../7/MemoryAccess/BasicTest/BasicTest.vm");
-    }
-
-    #[test]
-    fn pointer_test() {
-        check_tst("../../7/MemoryAccess/PointerTest/PointerTest.vm");
-    }
-
-    #[test]
-    fn static_test() {
-        check_tst("../../7/MemoryAccess/StaticTest/StaticTest.vm");
+    fn basic_loop() {
+        check_tst("../ProgramFlow/BasicLoop/BasicLoop.vm")
     }
 
     /// Compile provided vm file to asm, and check result with a `*.tst` file
