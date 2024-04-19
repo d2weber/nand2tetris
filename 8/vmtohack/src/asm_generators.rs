@@ -127,3 +127,39 @@ M=D
 A=M
 0;JMP"#
 }
+
+pub fn call_asm(name: &str, nargs: usize, return_label: &str) -> String {
+    let offset = i32::try_from(nargs).unwrap() - 5;
+    format!(
+        r#"
+        @{return_label} // Push return label on stack
+        D=A
+        {push_d}
+        @LCL // Push caller stuff to stack
+        D=M
+        {push_d}
+        @ARG
+        D=M
+        {push_d}
+        @THIS
+        D=M
+        {push_d}
+        @THAT
+        D=M
+        {push_d}
+        @SP // Reposition ARG
+        D=M
+        @{offset}
+        D=D-A
+        @ARG
+        M=D
+        @SP // Reposition LCL
+        D=M
+        @LCL
+        M=D
+        @{name} // Transfer controll to callee
+        0;JMP
+        ({return_label})"#,
+        push_d = push_d()
+    )
+}

@@ -128,6 +128,7 @@ fn compile_file(vm_file: &Path, out: &mut impl Write) {
         .unwrap_or_else(|_| panic!("Couldn't read {}.", vm_file.display()));
 
     let mut jmp_idx = 0;
+    let mut return_function_idx = 0..;
     let mut current_function = "root".to_owned();
     let mut result = trimmed_lines(&asm_file)
         .map(|l| {
@@ -156,6 +157,11 @@ fn compile_file(vm_file: &Path, out: &mut impl Write) {
                     format!("({module_id}.{current_function})\n{}", zero_local(nvars))
                 }
                 VmCommand::Return => return_asm(),
+                VmCommand::Call(name, nargs) => {
+                    let idx = return_function_idx.next().unwrap();
+                    let return_label = format!("({module_id}.{current_function}$ret{idx})");
+                    call_asm(&name, nargs, &return_label)
+                }
             };
             format!("// {l}\n{asm}")
         })
@@ -184,6 +190,7 @@ enum VmCommand {
     IfGoto(String),
     Function(String, usize),
     Return,
+    Call(String, usize),
 }
 
 impl FromStr for VmCommand {
@@ -216,6 +223,14 @@ impl FromStr for VmCommand {
                     .map_err(|_| "Unable to parse nargs")?,
             ),
             "return" => VmCommand::Return,
+            "call" => VmCommand::Call(
+                parts.next().ok_or("Missing function name")?.to_owned(),
+                parts
+                    .next()
+                    .ok_or("Missing nargs for function")?
+                    .parse()
+                    .map_err(|_| "Unable to parse nargs")?,
+            ),
             _ => return Err("Unexpected expression"),
         };
         if let Some(_) = parts.next() {
