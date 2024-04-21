@@ -2,10 +2,14 @@ class Main {
 	static int direction; // 1=left, 2=up, 3=right, 4=down
 	static GridP targ;
 	static int pauseTime;
+	static String pressAnyKeyToBeginStr, pressToPlayAgainStr, gameOverStr;
 
 	function void main() {
 		var SnakeBody snake;
 
+		let pressAnyKeyToBeginStr = "Press any key to begin.";
+		let pressToPlayAgainStr = "Press any key to play again.";
+		let gameOverStr = "Game Over.";
 		do Main.startScreen();
 
 		while (true) {
@@ -35,7 +39,7 @@ class Main {
 	function void startScreen() {
 		var int seed;
 		do Output.moveCursor(14,19);
-		do Output.printString("Press any key to begin.");
+		do Output.printString(pressAnyKeyToBeginStr);
 		let seed = 1;
 		while (Keyboard.keyPressed() = 0) {let seed = seed + 1;}
 		do Output.moveCursor(14,19);
@@ -48,10 +52,10 @@ class Main {
 		var int i;
 
 		do Output.moveCursor(10, 28);
-		do Output.printString("Game Over.");
+		do Output.printString(gameOverStr);
 		
 		do Output.moveCursor(14,19);
-		do Output.printString("Press any key to play again.");
+		do Output.printString(pressToPlayAgainStr);
 		do Sys.wait(700); // Avoid unwanted restart;
 		while (Keyboard.keyPressed() = 0) { do Sys.wait(5); }
 		return;

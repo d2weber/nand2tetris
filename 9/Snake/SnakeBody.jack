@@ -2,6 +2,7 @@ class SnakeBody {
 	field Array body;
 	field int i, length, head_idx;
 	field bool active;
+	static String scoreStr;
 	
 	constructor SnakeBody new() {
 		var GridP head;
@@ -16,6 +17,7 @@ class SnakeBody {
 		let body[3] = head;
 		let head_idx = 3;
 		let length = 4;
+		let scoreStr = "Score: ";
 		do printScore();
 		let active = true;
 		return this;
@@ -23,7 +25,7 @@ class SnakeBody {
 
 	method void printScore() {
 		do Output.moveCursor(0,0);
-		do Output.printString("Score: ");
+		do Output.printString(scoreStr);
 		do Output.printInt(score());
 		return;
 	}
