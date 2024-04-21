@@ -1,6 +1,7 @@
 class Main {
 	static int direction; // 1=left, 2=up, 3=right, 4=down
 	static GridP targ;
+	static int pauseTime;
 
 	function void main() {
 		var SnakeBody snake;
@@ -12,12 +13,14 @@ class Main {
 			do Screen.clearScreen();
 			let active = true;
 			let direction = 3;
+			let pauseTime = 30;
 			do Main.newTarget(); // Might undraw old target
 			let snake = SnakeBody.new();
 
 			while (active) {
 				if (targ.eq(snake.head())) {
 					do Main.newTarget();
+					do Main.adjustSpeed();
 					let active = snake.tryAdvanceGrowing(direction);
 				} else {
 					let active = snake.tryAdvance(direction);
@@ -32,6 +35,7 @@ class Main {
 		return;
 	}
 
+	// TODO: Fix leaking strings in start and end screen.
 	function void startScreen() {
 		var int seed;
 		do Output.moveCursor(14,19);
@@ -45,12 +49,22 @@ class Main {
 	}
 
 	function void gameOverScreen() {
+		var int i;
+
 		do Output.moveCursor(10, 28);
 		do Output.printString("Game Over.");
 		
 		do Output.moveCursor(14,19);
 		do Output.printString("Press any key to play again.");
-		do Keyboard.readChar();
+		do Sys.wait(700); // Avoid unwanted restart;
+		while (Keyboard.keyPressed() = 0) { do Sys.wait(5); }
+		return;
+	}
+
+	function void adjustSpeed() {
+		if (pauseTime>8) {
+			let pauseTime = pauseTime-1;
+		}
 		return;
 	}
 
@@ -70,7 +84,7 @@ class Main {
 		var char key;
 
 		let i = 0;
-		while(i<30) {
+		while(i<pauseTime) {
 			let i = i+1;
 
 			let key = Keyboard.keyPressed();
