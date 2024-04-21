@@ -5,7 +5,7 @@ class SnakeBody {
 	constructor SnakeBody new() {
 		var GridP head;
 		let body = Array.new((GridP.max_x()+1)*(GridP.max_y()+1));
-		let head = GridP.new(28,16);
+		let head = GridP.new(14,8);
 		let body[0] = head;
 		let head = head.right();
 		let body[1] = head;

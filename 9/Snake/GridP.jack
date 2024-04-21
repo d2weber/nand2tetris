@@ -44,13 +44,13 @@ class GridP {
 
 	method void draw() {
 		do Screen.setColor(true);
-		do Screen.drawRectangle(x*8, y*8, ((x+1)*8)-1, ((y+1)*8)-1);
+		do Screen.drawRectangle(x*16, y*16, ((x+1)*16)-1, ((y+1)*16)-1);
 		return;
 	}
 
 	method void undraw() {
 		do Screen.setColor(false);
-		do Screen.drawRectangle(x*8, y*8, ((x+1)*8)-1, ((y+1)*8)-1);
+		do Screen.drawRectangle(x*16, y*16, ((x+1)*16)-1, ((y+1)*16)-1);
 		return;
 	}
 
@@ -66,10 +66,10 @@ class GridP {
 	}
 
 	function int max_x() {
-		return 63; // 512/8 -1
+		return 31; // 512/16 -1
 	}
 
 	function int max_y() {
-		return 31; // 256/8 -1
+		return 15; // 256/16 -1
 	}
 }
