@@ -1,9 +1,9 @@
 class Main {
+	static int direction; // 1=left, 2=up, 3=right, 4=down
+
 	function void main() {
 		var GridP x, targ;
-		var int i, direction; // 1=left, 2=up, 3=right, 4=down
 		var int seed;
-		var char key;
 		var SnakeBody snake;
 		var bool active;
 
@@ -16,10 +16,7 @@ class Main {
 
 		do LCGRandom.setSeed(Math.abs(seed));
 
-		let targ = GridP.new(
-			LCGRandom.randRange(0,GridP.max_x()),
-			LCGRandom.randRange(0,GridP.max_y())
-		);
+		let targ = Main.newTarget();
 
 		let active = true;
 		let direction = 3;
@@ -37,33 +34,45 @@ class Main {
 
 				do targ.disposeKeepDrawn();
 
-				let targ = GridP.new(
-					LCGRandom.randRange(0,GridP.max_x()),
-					LCGRandom.randRange(0,GridP.max_y())
-				);
+				let targ = Main.newTarget();
 
 				let active = snake.tryAdvanceGrowing(direction);
 			} else {
 				let active = snake.tryAdvance(direction);
 			}
 
-			let i = 0;
-			while(i<30) {
-				let i = i+1;
-
-				let key = Keyboard.keyPressed();
-		        if (key = 130) { let direction = 1; }   // left arrow
-		        if (key = 131) { let direction = 2; }   // up arrow
-		        if (key = 132) { let direction = 3; }   // right arrow
-		        if (key = 133) { let direction = 4; }   // down arrow
-
-				do Sys.wait(5);
-			}
+			do Main.readAndUpdateDirection();
 		}
 
 
 		do Output.moveCursor(10, 28);
 		do Output.printString("Game Over.");
+		return;
+	}
+
+	function GridP newTarget() {
+		return GridP.new(
+			LCGRandom.randRange(0,GridP.max_x()),
+			LCGRandom.randRange(0,GridP.max_y())
+		);
+	}
+
+	function void readAndUpdateDirection() {
+		var int i;
+		var char key;
+
+		let i = 0;
+		while(i<30) {
+			let i = i+1;
+
+			let key = Keyboard.keyPressed();
+	        if (key = 130) { let direction = 1; }   // left arrow
+	        if (key = 131) { let direction = 2; }   // up arrow
+	        if (key = 132) { let direction = 3; }   // right arrow
+	        if (key = 133) { let direction = 4; }   // down arrow
+
+			do Sys.wait(5);
+		}
 		return;
 	}
 }
