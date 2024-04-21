@@ -104,4 +104,19 @@ class SnakeBody {
 		}
 		return;
 	}
+
+	method void dispose() {
+		var int i;
+		var GridP p;
+
+		let i = 0;
+		while (i<length) {
+			let p = body[i];
+			do p.dispose();
+			let i = i + 1;
+		}
+		do body.dispose();
+		do Memory.deAlloc(this);
+		return;
+	}
 }

@@ -27,6 +27,7 @@ class Main {
 			}
 
 			do Main.gameOverScreen();
+			do snake.dispose();
 		}
 		return;
 	}
