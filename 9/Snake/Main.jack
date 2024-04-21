@@ -5,25 +5,21 @@ class Main {
 
 	function void main() {
 		var SnakeBody snake;
-		var bool active;
 
 		do Main.startScreen();
 
 		while (true) {
 			do Screen.clearScreen();
-			let active = true;
 			let direction = 3;
 			let pauseTime = 30;
 			do Main.newTarget(); // Might undraw old target
 			let snake = SnakeBody.new();
 
-			while (active) {
-				if (targ.eq(snake.head())) {
+			while (snake.active()) {
+				if (snake.step(direction, targ)) {
 					do Main.newTarget();
 					do Main.adjustSpeed();
-					let active = snake.tryAdvanceGrowing(direction);
-				} else {
-					let active = snake.tryAdvance(direction);
+					do snake.printScore();
 				}
 
 				do Main.readAndUpdateDirection();

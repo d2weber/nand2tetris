@@ -1,6 +1,7 @@
 class SnakeBody {
 	field Array body;
 	field int i, length, head_idx;
+	field bool active;
 	
 	constructor SnakeBody new() {
 		var GridP head;
@@ -16,6 +17,7 @@ class SnakeBody {
 		let head_idx = 3;
 		let length = 4;
 		do printScore();
+		let active = true;
 		return this;
 	}
 
@@ -24,6 +26,39 @@ class SnakeBody {
 		do Output.printString("Score: ");
 		do Output.printInt(score());
 		return;
+	}
+
+	// Returns whether target has been eaten
+	method bool step(int direction, GridP targ) {
+		var bool hasBeenEaten;
+		var GridP head, tail;
+
+		let hasBeenEaten = targ.eq(head());
+		let head = maybeNewHead(direction);
+		if (head=null) {
+			let active = false;
+			return false;
+		}
+		do advanceHeadIdx();
+		if (hasBeenEaten) {
+			do makeSpaceForHead();
+		}
+		else
+		{
+			let tail = body[head_idx];
+			if (targ.eq(tail)) {
+				// Mitigate spawned targ on snake
+				do tail.disposeKeepDrawn();
+			} else {
+				do tail.dispose();
+			}
+		}
+		let body[head_idx] = head;
+		return hasBeenEaten;
+	}
+
+	method bool active() {
+		return active;
 	}
 
 	method int score() {
@@ -46,8 +81,6 @@ class SnakeBody {
 
 	method void disposeTail() {
 		var GridP tail;
-		let tail = body[head_idx];
-		do tail.dispose();
 		return;
 	}
 
@@ -74,27 +107,6 @@ class SnakeBody {
 		}
 
 		return head;
-	}
-
-	method bool tryAdvance(int direction) {
-		var GridP head;
-		let head = maybeNewHead(direction);
-		if (head=null) {return false;}
-		do advanceHeadIdx();
-		do disposeTail();
-		let body[head_idx] = head;
-		return true;
-	}
-
-	method bool tryAdvanceGrowing(int direction) {
-		var GridP head;
-		let head = maybeNewHead(direction);
-		if (head=null) {return false;}
-		do advanceHeadIdx();
-		do makeSpaceForHead();
-		let body[head_idx] = head;
-		do printScore();
-		return true;
 	}
 
 	method void advanceHeadIdx() {
