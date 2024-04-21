@@ -1,41 +1,22 @@
 class Main {
 	static int direction; // 1=left, 2=up, 3=right, 4=down
+	static GridP targ;
 
 	function void main() {
-		var GridP x, targ;
-		var int seed;
 		var SnakeBody snake;
 		var bool active;
 
-		do Output.moveCursor(14,19);
-		do Output.printString("Press any key to begin.");
-		let seed = 1;
-		while (Keyboard.keyPressed() = 0) {let seed = seed + 1;}
-		do Output.moveCursor(14,19);
-		do Output.printString("                       ");
+		do Main.startScreen();
 
-		do LCGRandom.setSeed(Math.abs(seed));
-
-		let targ = Main.newTarget();
-
+		do Screen.clearScreen();
 		let active = true;
 		let direction = 3;
 		let snake = SnakeBody.new();
-
-		do Output.moveCursor(0,0);
-		do Output.printString("Score: ");
-		do Output.printInt(snake.score());
+		do Main.newTarget();
 
 		while (active) {
 			if (targ.eq(snake.head())) {
-				do Output.moveCursor(0,0);
-				do Output.printString("Score: ");
-				do Output.printInt(snake.score());
-
-				do targ.disposeKeepDrawn();
-
-				let targ = Main.newTarget();
-
+				do Main.newTarget();
 				let active = snake.tryAdvanceGrowing(direction);
 			} else {
 				let active = snake.tryAdvance(direction);
@@ -44,17 +25,32 @@ class Main {
 			do Main.readAndUpdateDirection();
 		}
 
-
 		do Output.moveCursor(10, 28);
 		do Output.printString("Game Over.");
 		return;
 	}
 
-	function GridP newTarget() {
-		return GridP.new(
+	function void startScreen() {
+		var int seed;
+		do Output.moveCursor(14,19);
+		do Output.printString("Press any key to begin.");
+		let seed = 1;
+		while (Keyboard.keyPressed() = 0) {let seed = seed + 1;}
+		do Output.moveCursor(14,19);
+
+		do LCGRandom.setSeed(Math.abs(seed));
+		return;
+	}
+
+	function void newTarget() {
+		if (~(targ=null)) {
+			do targ.disposeKeepDrawn(); // Head is on this field
+		}
+		let targ = GridP.new(
 			LCGRandom.randRange(0,GridP.max_x()),
 			LCGRandom.randRange(0,GridP.max_y())
 		);
+		return;
 	}
 
 	function void readAndUpdateDirection() {

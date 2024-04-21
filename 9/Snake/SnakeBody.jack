@@ -4,7 +4,6 @@ class SnakeBody {
 	
 	constructor SnakeBody new() {
 		var GridP head;
-		let length = 4;
 		let body = Array.new((GridP.max_x()+1)*(GridP.max_y()+1));
 		let head = GridP.new(28,16);
 		let body[0] = head;
@@ -15,7 +14,16 @@ class SnakeBody {
 		let head = head.right();
 		let body[3] = head;
 		let head_idx = 3;
+		let length = 4;
+		do printScore();
 		return this;
+	}
+
+	method void printScore() {
+		do Output.moveCursor(0,0);
+		do Output.printString("Score: ");
+		do Output.printInt(score());
+		return;
 	}
 
 	method int score() {
@@ -85,6 +93,7 @@ class SnakeBody {
 		do advanceHeadIdx();
 		do makeSpaceForHead();
 		let body[head_idx] = head;
+		do printScore();
 		return true;
 	}
 
