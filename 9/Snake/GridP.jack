@@ -54,6 +54,11 @@ class GridP {
 		return;
 	}
 
+	method void disposeKeepDrawn() {
+		do Memory.deAlloc(this);
+		return;
+	}
+
 	method void dispose() {
 		do undraw();
 		do Memory.deAlloc(this);

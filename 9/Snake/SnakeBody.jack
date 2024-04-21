@@ -1,0 +1,94 @@
+class SnakeBody {
+	field Array body;
+	field int i, length, head_idx;
+	field GridP head;
+	
+	constructor SnakeBody new() {
+		let length = 4;
+		let body = Array.new((GridP.max_x()+1)*(GridP.max_y()+1));
+		let head = GridP.new(28,16);
+		let body[0] = head;
+		let head = head.right();
+		let body[1] = head;
+		let head = head.right();
+		let body[2] = head;
+		let head = head.right();
+		let body[3] = head;
+		let head_idx = 3;
+		return this;
+	}
+
+	method int score() {
+		return length-4;
+	}
+
+	method GridP head() {
+		return head;
+	}
+
+	method void makeSpaceForHead() {
+		let i = length;
+		while (head_idx < i) {
+			let body[i] = body[i-1];
+			let i = i - 1;
+		}
+		let length = length + 1;
+		return;
+	}
+
+	method void disposeTail() {
+		var GridP tail;
+		let tail = body[head_idx];
+		do tail.dispose();
+		return;
+	}
+
+	method void commitNewHead() {
+		let body[head_idx] = head;
+		return;
+	}
+
+	method void tryAdvance(int direction) {
+		let head = body[head_idx];
+		if (direction=1) {let head = head.left();}
+		if (direction=2) {let head = head.above();}
+		if (direction=3) {let head = head.right();}
+		if (direction=4) {let head = head.below();}
+
+		let i = 0;
+		while ((i<length) & ~(head=null)) {
+			if (head.eq(body[i])) {
+				let head = null;
+			}
+			let i = i+1;
+		}
+		do advanceHeadIdx();
+		return;
+	}
+
+	method void advance(int direction) {
+		do tryAdvance(direction);
+		do disposeTail();
+		do commitNewHead();
+		return;
+	}
+
+	method void advanceGrowing(int direction) {
+		do tryAdvance(direction);
+		do makeSpaceForHead();
+		do commitNewHead();
+		return;
+	}
+
+	method void advanceHeadIdx() {
+		let head_idx = head_idx + 1;
+		if (head_idx=length) {
+			let head_idx = head_idx - length;
+		}
+		return;
+	}
+
+	method bool gameOver() {
+		return head=null;
+	}
+}
