@@ -5,6 +5,7 @@ class Main {
 		var int seed;
 		var char key;
 		var SnakeBody snake;
+		var bool active;
 
 		do Output.moveCursor(14,19);
 		do Output.printString("Press any key to begin.");
@@ -20,6 +21,7 @@ class Main {
 			LCGRandom.randRange(0,GridP.max_y())
 		);
 
+		let active = true;
 		let direction = 3;
 		let snake = SnakeBody.new();
 
@@ -27,8 +29,7 @@ class Main {
 		do Output.printString("Score: ");
 		do Output.printInt(snake.score());
 
-
-		while (~snake.gameOver()) {
+		while (active) {
 			if (targ.eq(snake.head())) {
 				do Output.moveCursor(0,0);
 				do Output.printString("Score: ");
@@ -41,9 +42,9 @@ class Main {
 					LCGRandom.randRange(0,GridP.max_y())
 				);
 
-				do snake.advanceGrowing(direction);
+				let active = snake.tryAdvanceGrowing(direction);
 			} else {
-				do snake.advance(direction);
+				let active = snake.tryAdvance(direction);
 			}
 
 			let i = 0;

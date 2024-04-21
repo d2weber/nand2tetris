@@ -1,9 +1,9 @@
 class SnakeBody {
 	field Array body;
 	field int i, length, head_idx;
-	field GridP head;
 	
 	constructor SnakeBody new() {
+		var GridP head;
 		let length = 4;
 		let body = Array.new((GridP.max_x()+1)*(GridP.max_y()+1));
 		let head = GridP.new(28,16);
@@ -23,7 +23,7 @@ class SnakeBody {
 	}
 
 	method GridP head() {
-		return head;
+		return body[head_idx];
 	}
 
 	method void makeSpaceForHead() {
@@ -43,41 +43,49 @@ class SnakeBody {
 		return;
 	}
 
-	method void commitNewHead() {
-		let body[head_idx] = head;
-		return;
-	}
-
-	method void tryAdvance(int direction) {
+	method GridP maybeNewHead(int direction) {
+		var GridP head;
 		let head = body[head_idx];
 		if (direction=1) {let head = head.left();}
 		if (direction=2) {let head = head.above();}
 		if (direction=3) {let head = head.right();}
 		if (direction=4) {let head = head.below();}
 
+		// We're out of bounds
+		if (head=null) {
+			return null;
+		}
+
+		// Check if we bit our tail
 		let i = 0;
-		while ((i<length) & ~(head=null)) {
+		while (i<length) {
 			if (head.eq(body[i])) {
-				let head = null;
+				return null;
 			}
 			let i = i+1;
 		}
+
+		return head;
+	}
+
+	method bool tryAdvance(int direction) {
+		var GridP head;
+		let head = maybeNewHead(direction);
+		if (head=null) {return false;}
 		do advanceHeadIdx();
-		return;
-	}
-
-	method void advance(int direction) {
-		do tryAdvance(direction);
 		do disposeTail();
-		do commitNewHead();
-		return;
+		let body[head_idx] = head;
+		return true;
 	}
 
-	method void advanceGrowing(int direction) {
-		do tryAdvance(direction);
+	method bool tryAdvanceGrowing(int direction) {
+		var GridP head;
+		let head = maybeNewHead(direction);
+		if (head=null) {return false;}
+		do advanceHeadIdx();
 		do makeSpaceForHead();
-		do commitNewHead();
-		return;
+		let body[head_idx] = head;
+		return true;
 	}
 
 	method void advanceHeadIdx() {
@@ -86,9 +94,5 @@ class SnakeBody {
 			let head_idx = head_idx - length;
 		}
 		return;
-	}
-
-	method bool gameOver() {
-		return head=null;
 	}
 }
