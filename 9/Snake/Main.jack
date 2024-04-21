@@ -1,0 +1,106 @@
+class Main {
+	function void main() {
+		var GridP tail, head, targ;
+		var Array snake;
+		var int length, head_idx;
+		var int i, direction; // 1=left, 2=up, 3=right, 4=down
+		var int seed;
+		var char key;
+
+
+
+		let length = 4;
+		let snake = Array.new((GridP.max_x()+1)*(GridP.max_y()+1));
+		let head = GridP.new(28,16);
+		let snake[0] = head;
+		let head = head.right();
+		let snake[1] = head;
+		let head = head.right();
+		let snake[2] = head;
+		let head = head.right();
+		let snake[3] = head;
+		let head_idx = 3;
+		let head = snake[head_idx];
+		let head = head.right();
+
+		let direction = 3;
+
+		do Output.printString("Score: ");
+		do Output.printInt(length-4);
+
+		do Output.moveCursor(14,19);
+		do Output.printString("Press any key to begin.");
+		let seed = 1;
+		while (Keyboard.keyPressed() = 0) {let seed = seed + 1;}
+		do Output.moveCursor(14,19);
+		do Output.printString("                       ");
+		do LCGRandom.setSeed(Math.abs(seed));
+		let targ = GridP.new(
+			LCGRandom.randRange(0,GridP.max_x()),
+			LCGRandom.randRange(0,GridP.max_y())
+		);
+
+		while (~(head=null)) {
+			let head_idx = head_idx + 1;
+			if (head_idx=length) {
+				let head_idx = head_idx - length;
+			}
+			if (head.eq(targ)) {
+				do Output.moveCursor(0,0);
+				do Output.printString("Score: ");
+				do Output.printInt(length-4);
+
+				do targ.dispose();
+				do head.draw(); // has been undrawn
+
+				let i = length;
+				while (head_idx < i) {
+					let snake[i] = snake[i-1];
+					let i = i - 1;
+				}
+				let length = length + 1;
+				
+				let targ = GridP.new(
+					LCGRandom.randRange(0,GridP.max_x()),
+					LCGRandom.randRange(0,GridP.max_y())
+				);
+			} else {
+				let tail = snake[head_idx];
+				do tail.dispose();
+			}
+			let snake[head_idx] = head;
+
+			let i = 0;
+			while(i<30) {
+				let i = i+1;
+
+				let key = Keyboard.keyPressed();
+		        if (key = 130) { let direction = 1; }   // left arrow
+		        if (key = 131) { let direction = 2; }   // up arrow
+		        if (key = 132) { let direction = 3; }   // right arrow
+		        if (key = 133) { let direction = 4; }   // down arrow
+
+				do Sys.wait(5);
+			}
+
+			let head = snake[head_idx];
+			if (direction=1) {let head = head.left();}
+			if (direction=2) {let head = head.above();}
+			if (direction=3) {let head = head.right();}
+			if (direction=4) {let head = head.below();}
+
+			let i = 0;
+			while ((i<length) & ~(head=null)) {
+				if (head.eq(snake[i])) {
+					let head = null;
+				}
+				let i = i+1;
+			}
+
+		}
+
+		do Output.moveCursor(10, 28);
+		do Output.printString("Game Over.");
+		return;
+	}
+}

@@ -1,0 +1,70 @@
+/** Represents an 8x8 pixel point on a grid on the screen */
+class GridP {
+	field int x, y;
+
+	// Inputs have to be within the valid range!
+	constructor GridP new(int arg_x, int arg_y) {
+		let x = arg_x;
+		let y = arg_y;
+		do draw();
+		return this;
+	}
+
+	/** Create a new instance, return null if a wall is reached */
+	function GridP maybeNew(int x, int y) {
+		if ((x < 0) | (x > GridP.max_x()) | (y < 0) | (y > GridP.max_y()) ) {
+			return null;
+		}
+		return GridP.new(x,y);
+	}
+
+	method int x() {
+		return x;
+	}
+	method int y() {
+		return y;
+	}
+
+	method bool eq(GridP other) {
+		return (x = other.x()) & (y = other.y());
+	}
+
+	method GridP left() {
+		return GridP.maybeNew(x-1, y);
+	}
+	method GridP right() {
+		return GridP.maybeNew(x+1, y);
+	}
+	method GridP above() {
+		return GridP.maybeNew(x, y-1);
+	}
+	method GridP below() {
+		return GridP.maybeNew(x, y+1);
+	}
+
+	method void draw() {
+		do Screen.setColor(true);
+		do Screen.drawRectangle(x*8, y*8, ((x+1)*8)-1, ((y+1)*8)-1);
+		return;
+	}
+
+	method void undraw() {
+		do Screen.setColor(false);
+		do Screen.drawRectangle(x*8, y*8, ((x+1)*8)-1, ((y+1)*8)-1);
+		return;
+	}
+
+	method void dispose() {
+		do undraw();
+		do Memory.deAlloc(this);
+		return;
+	}
+
+	function int max_x() {
+		return 63; // 512/8 -1
+	}
+
+	function int max_y() {
+		return 31; // 256/8 -1
+	}
+}
