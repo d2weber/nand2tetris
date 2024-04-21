@@ -8,25 +8,26 @@ class Main {
 
 		do Main.startScreen();
 
-		do Screen.clearScreen();
-		let active = true;
-		let direction = 3;
-		let snake = SnakeBody.new();
-		do Main.newTarget();
+		while (true) {
+			do Screen.clearScreen();
+			let active = true;
+			let direction = 3;
+			do Main.newTarget(); // Might undraw old target
+			let snake = SnakeBody.new();
 
-		while (active) {
-			if (targ.eq(snake.head())) {
-				do Main.newTarget();
-				let active = snake.tryAdvanceGrowing(direction);
-			} else {
-				let active = snake.tryAdvance(direction);
+			while (active) {
+				if (targ.eq(snake.head())) {
+					do Main.newTarget();
+					let active = snake.tryAdvanceGrowing(direction);
+				} else {
+					let active = snake.tryAdvance(direction);
+				}
+
+				do Main.readAndUpdateDirection();
 			}
 
-			do Main.readAndUpdateDirection();
+			do Main.gameOverScreen();
 		}
-
-		do Output.moveCursor(10, 28);
-		do Output.printString("Game Over.");
 		return;
 	}
 
@@ -39,6 +40,16 @@ class Main {
 		do Output.moveCursor(14,19);
 
 		do LCGRandom.setSeed(Math.abs(seed));
+		return;
+	}
+
+	function void gameOverScreen() {
+		do Output.moveCursor(10, 28);
+		do Output.printString("Game Over.");
+		
+		do Output.moveCursor(14,19);
+		do Output.printString("Press any key to play again.");
+		do Keyboard.readChar();
 		return;
 	}
 
