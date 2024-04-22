@@ -1,7 +1,7 @@
 class Main {
 	static int direction; // 1=left, 2=up, 3=right, 4=down
 	static GridP targ;
-	static int pauseTime;
+	static int delay, nDelays;
 	static String pressAnyKeyToBeginStr, pressToPlayAgainStr, gameOverStr;
 
 	function void main() {
@@ -15,17 +15,16 @@ class Main {
 		while (true) {
 			do Screen.clearScreen();
 			let direction = 3;
-			let pauseTime = 30;
 			do Main.newTarget(); // Might undraw old target
 			let snake = SnakeBody.new();
+			do Main.adjustSpeed(snake.score());
 
 			while (snake.active()) {
 				if (snake.step(direction, targ)) {
 					do Main.newTarget();
-					do Main.adjustSpeed();
+					do Main.adjustSpeed(snake.score());
 					do snake.printScore();
 				}
-
 				do Main.readAndUpdateDirection();
 			}
 
@@ -61,10 +60,13 @@ class Main {
 		return;
 	}
 
-	function void adjustSpeed() {
-		if (pauseTime>8) {
-			let pauseTime = pauseTime-1;
-		}
+	function void adjustSpeed(int score) {
+		var int frequency; // aimed number of updates in 10s
+
+		let frequency = 50 + (2*score);
+		if (200<frequency) {let frequency = 200;}
+		let nDelays = 3333/frequency;
+		let delay = 3;
 		return;
 	}
 
@@ -84,19 +86,23 @@ class Main {
 		var char key;
 
 		let i = 0;
-		while(i<pauseTime) {
+		while(i<nDelays) {
 			let i = i+1;
 
 			let key = Keyboard.keyPressed();
 	        if (key = 130) { let direction = 1; }   // left arrow
+	        if (key =  65) { let direction = 1; }   // A
 	        if (key = 131) { let direction = 2; }   // up arrow
+	        if (key =  87) { let direction = 2; }   // W
 	        if (key = 132) { let direction = 3; }   // right arrow
+	        if (key =  68) { let direction = 3; }   // D
 	        if (key = 133) { let direction = 4; }   // down arrow
+	        if (key =  83) { let direction = 4; }   // S
 
 			// Draw white line in the corner to avoid gliches
 			do Memory.poke(16384, 0);
 
-			do Sys.wait(5);
+			do Sys.wait(delay);
 		}
 		return;
 	}
