@@ -21,7 +21,7 @@ fn main() {
 
 #[cfg(test)]
 mod test {
-    use std::process::Command;
+    use std::process::{Command, Stdio};
 
     use super::*;
 
@@ -78,7 +78,7 @@ mod test {
                 .arg(path)
                 .arg(reference)
                 .current_dir(cargo_root)
-                // .stdout(Stdio::null())
+                .stdout(Stdio::null())
                 .status()
                 .expect("Failed to run TextComparer")
                 .success(),
@@ -145,7 +145,13 @@ impl Token {
     fn write_xml(&self, out: &mut impl Write) {
         match self {
             Token::Keyword(s) => writeln!(out, "<keyword> {s} </keyword>").unwrap(),
-            Token::Symbol(s) => writeln!(out, "<symbol> {s} </symbol>").unwrap(),
+            Token::Symbol(s) => match s {
+                '<' => writeln!(out, "<symbol> &lt; </symbol>"),
+                '>' => writeln!(out, "<symbol> &gt; </symbol>"),
+                '&' => writeln!(out, "<symbol> &amp; </symbol>"),
+                s => writeln!(out, "<symbol> {s} </symbol>"),
+            }
+            .unwrap(),
             Token::Identifier(s) => writeln!(out, "<identifier> {s} </identifier>").unwrap(),
             Token::IntegerConstant(s) => {
                 writeln!(out, "<integerConstant> {s} </integerConstant>").unwrap()
