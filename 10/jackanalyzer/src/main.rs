@@ -21,7 +21,7 @@ fn main() {
 
 #[cfg(test)]
 mod test {
-    use std::process::{Command, Stdio};
+    use std::process::Command;
 
     use super::*;
 
@@ -91,19 +91,35 @@ fn compile_file(jack_file: &Path, out: &mut impl Write) {
     let jack_file = fs::read_to_string(jack_file)
         .unwrap_or_else(|_| panic!("Couldn't read {}.", jack_file.display()));
 
-    out.write_all(b"").expect("Failed to write output file");
+    let filtered = filter_comments(&jack_file);
+    out.write_all(filtered.as_bytes())
+        .expect("Failed to write output file");
 }
 
-fn trimmed_lines(s: &str) -> impl Iterator<Item = &str> {
-    s.lines()
-        .map(|l| strip_comment(l).trim())
-        .filter(|l| !l.is_empty())
-}
-
-fn strip_comment(s: &str) -> &str {
-    if let Some((content, _comment)) = s.split_once("//") {
-        content
-    } else {
-        s
+fn filter_comments(s: &str) -> String {
+    // Remove block comments
+    let mut rest = s;
+    let mut block_filtered = String::new();
+    while let Some((first, comment_and_rest)) = rest.split_once("/*") {
+        block_filtered += first;
+        let (_comment, new_rest) = comment_and_rest
+            .split_once("*/")
+            .expect("Missing closing block comment");
+        rest = new_rest;
     }
+    block_filtered += rest;
+
+    // Remove line comments
+    let mut rest = block_filtered.as_str();
+    let mut filtered = String::new();
+    while let Some((first, comment_and_rest)) = rest.split_once("//") {
+        filtered += first;
+        filtered.push('\n'); // reinsert newline
+        rest = if let Some((_comment, new_rest)) = comment_and_rest.split_once('\n') {
+            new_rest
+        } else {
+            "" // Last line in string
+        }
+    }
+    filtered + rest
 }
