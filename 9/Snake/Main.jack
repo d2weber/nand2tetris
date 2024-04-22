@@ -93,6 +93,9 @@ class Main {
 	        if (key = 132) { let direction = 3; }   // right arrow
 	        if (key = 133) { let direction = 4; }   // down arrow
 
+			// Draw white line in the corner to avoid gliches
+			do Memory.poke(16384, 0);
+
 			do Sys.wait(5);
 		}
 		return;
