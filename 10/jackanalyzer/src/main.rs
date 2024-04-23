@@ -2,6 +2,7 @@ use std::{
     env,
     fs::{self, File},
     io::{BufWriter, Write},
+    iter::Peekable,
     path::{Path, PathBuf},
 };
 
@@ -140,17 +141,44 @@ fn compile_file(jack_file: &Path, out: &mut impl Write) {
 
     let filtered = filter_comments(&jack_file);
 
-    let tokens = token_stream(&filtered);
-    // compileClass(out, tokens);
+    let mut tokens = token_stream(&filtered).peekable();
+    compile_class(out, &mut tokens).unwrap();
     // out.write_all(filtered.as_bytes())
     //     .expect("Failed to write output file");
 }
 
-// fn compileClass(out: impl Write, tokens: impl Iterator<Item = Token>) {
-//     write!("<")
-// }
+type Res = Result<(), &'static str>;
 
-#[derive(Debug)]
+fn compile_class(out: &mut impl Write, tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Res {
+    writeln!(out, "<class>").unwrap();
+    tokens.next().unwrap().write_xml(out); // class
+    tokens.next().unwrap().write_xml(out); // Identifier
+    tokens.next().unwrap().write_xml(out); // {
+
+    // match tokens.peek().unwrap() {
+    //     Token::Keyword(_) => todo!(),
+    //     Token::Symbol(_) => todo!(),
+    //     Token::Identifier(_) => todo!(),
+    //     Token::IntegerConstant(_) => todo!(),
+    //     Token::StringConstant(_) => todo!(),
+    // }
+    // compile_class_variable_declaration(out, tokens)?;
+
+    writeln!(out, "</class>").unwrap();
+    Ok(())
+}
+
+fn compile_class_variable_declaration(
+    out: &mut impl Write,
+    tokens: &mut impl Iterator<Item = Token>,
+) -> Res {
+    writeln!(out, "<classVarDec>").unwrap();
+
+    writeln!(out, "</classVarDec>").unwrap();
+    Ok(())
+}
+
+#[derive(Debug, PartialEq)]
 enum Token {
     Keyword(String),
     Symbol(char),
@@ -159,7 +187,6 @@ enum Token {
     StringConstant(String),
 }
 impl Token {
-    #[cfg(test)]
     fn write_xml(&self, out: &mut impl Write) {
         match self {
             Token::Keyword(s) => writeln!(out, "<keyword> {s} </keyword>").unwrap(),
