@@ -1,14 +1,10 @@
 use std::{
     fs::{self, File},
     io::BufWriter,
-    iter::Peekable,
     path::Path,
 };
 
-use crate::token::{
-    token_stream,
-    Token::{self, *},
-};
+use crate::token::{Token::*, TokenStream};
 type Res = Result<(), &'static str>;
 
 pub(crate) fn compile_path(path: &Path) -> std::io::Result<()> {
@@ -46,7 +42,7 @@ fn compile_file(jack_file: &Path, out: &mut impl std::io::Write) {
 
     let filtered = filter_comments(&s);
 
-    let mut tokens = token_stream(&filtered).peekable();
+    let mut tokens = TokenStream::new(&filtered);
     compile_class(out, &mut tokens).unwrap_or_else(|e| {
         out.flush().unwrap();
         panic!("Compilation failed: {e} ({})", jack_file.display());
@@ -81,10 +77,7 @@ pub(crate) fn filter_comments(s: &str) -> String {
     filtered + rest
 }
 
-pub(crate) fn compile_class<'a>(
-    out: &mut impl std::io::Write,
-    tokens: &mut Peekable<impl Iterator<Item = Token<'a>>>,
-) -> Res {
+pub(crate) fn compile_class<'a>(out: &mut impl std::io::Write, tokens: &mut TokenStream) -> Res {
     writeln!(out, "<class>").unwrap();
     tokens.next().unwrap().write_xml(out); // class
     tokens.next().unwrap().write_xml(out); // Identifier
@@ -120,7 +113,7 @@ pub(crate) fn compile_class<'a>(
 
 fn compile_class_variable_declaration<'a>(
     out: &mut impl std::io::Write,
-    tokens: &mut Peekable<impl Iterator<Item = Token<'a>>>,
+    tokens: &mut TokenStream,
 ) -> Res {
     writeln!(out, "<classVarDec>").unwrap();
     tokens.next().unwrap().write_xml(out); // field | static
@@ -141,10 +134,7 @@ fn compile_class_variable_declaration<'a>(
     writeln!(out, "</classVarDec>").unwrap();
     Ok(())
 }
-fn compile_subroutine<'a>(
-    out: &mut impl std::io::Write,
-    tokens: &mut Peekable<impl Iterator<Item = Token<'a>>>,
-) -> Res {
+fn compile_subroutine<'a>(out: &mut impl std::io::Write, tokens: &mut TokenStream) -> Res {
     writeln!(out, "<subroutineDec>").unwrap();
     tokens.next().unwrap().write_xml(out); // constructor | function | method
     tokens.next().unwrap().write_xml(out); // type
@@ -178,10 +168,7 @@ fn compile_subroutine<'a>(
     Ok(())
 }
 
-fn compile_statements<'a>(
-    out: &mut impl std::io::Write,
-    tokens: &mut Peekable<impl Iterator<Item = Token<'a>>>,
-) -> Res {
+fn compile_statements<'a>(out: &mut impl std::io::Write, tokens: &mut TokenStream) -> Res {
     writeln!(out, "<statements>").unwrap();
     loop {
         match tokens.peek().unwrap() {
@@ -251,20 +238,14 @@ fn compile_statements<'a>(
     Ok(())
 }
 
-fn compile_term<'a>(
-    out: &mut impl std::io::Write,
-    tokens: &mut Peekable<impl Iterator<Item = Token<'a>>>,
-) -> Res {
+fn compile_term<'a>(out: &mut impl std::io::Write, tokens: &mut TokenStream) -> Res {
     writeln!(out, "<term>").unwrap();
     compile_term_inner(out, tokens)?;
     writeln!(out, "</term>").unwrap();
     Ok(())
 }
 
-fn compile_term_inner<'a>(
-    out: &mut impl std::io::Write,
-    tokens: &mut Peekable<impl Iterator<Item = Token<'a>>>,
-) -> Res {
+fn compile_term_inner<'a>(out: &mut impl std::io::Write, tokens: &mut TokenStream) -> Res {
     let t1 = tokens.next().unwrap();
     t1.write_xml(out);
     Ok(match (&t1, tokens.peek().unwrap()) {
@@ -304,7 +285,7 @@ fn compile_term_inner<'a>(
 
 fn compile_expression_list<'a>(
     out: &mut impl std::io::Write,
-    tokens: &mut Peekable<impl Iterator<Item = Token<'a>>>,
+    tokens: &mut TokenStream,
 ) -> Result<usize, &'static str> {
     writeln!(out, "<expressionList>").unwrap();
     let mut n = 0;
@@ -324,10 +305,7 @@ fn compile_expression_list<'a>(
     Ok(n)
 }
 
-fn compile_expression<'a>(
-    out: &mut impl std::io::Write,
-    tokens: &mut Peekable<impl Iterator<Item = Token<'a>>>,
-) -> Res {
+fn compile_expression<'a>(out: &mut impl std::io::Write, tokens: &mut TokenStream) -> Res {
     writeln!(out, "<expression>").unwrap();
     compile_term(out, tokens)?;
     while matches!(
@@ -350,7 +328,7 @@ fn compile_expression<'a>(
 }
 fn compile_variable_declaration<'a>(
     out: &mut impl std::io::Write,
-    tokens: &mut Peekable<impl Iterator<Item = Token<'a>>>,
+    tokens: &mut TokenStream,
 ) -> Res {
     writeln!(out, "<varDec>").unwrap();
     loop {

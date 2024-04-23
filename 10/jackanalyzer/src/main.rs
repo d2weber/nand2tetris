@@ -21,6 +21,8 @@ fn main() {
 mod test {
     use std::{fs, io::BufWriter, io::Write, path::Path, process::Command, str::from_utf8};
 
+    use self::token::TokenStream;
+
     use super::*;
 
     #[test]
@@ -82,7 +84,7 @@ mod test {
             let filtered =
                 compilation_engine::filter_comments(&fs::read_to_string(&jack_file).unwrap());
             writeln!(out, "<tokens>").unwrap();
-            token::token_stream(&filtered).for_each(|t| t.write_xml(&mut out));
+            TokenStream::new(&filtered).for_each(|t| t.write_xml(&mut out));
             writeln!(out, "</tokens>").unwrap();
         }
         out_filename

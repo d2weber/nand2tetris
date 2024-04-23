@@ -1,11 +1,14 @@
+use std::iter::Peekable;
+
 #[derive(Debug, PartialEq)]
-pub(crate) enum Token<'a> {
+pub enum Token<'a> {
     Keyword(&'a str),
     Symbol(char),
     Identifier(&'a str),
     IntegerConstant(i32),
     StringConstant(&'a str),
 }
+
 impl<'a> Token<'a> {
     pub(crate) fn write_xml(&self, out: &mut impl std::io::Write) {
         match self {
@@ -25,6 +28,35 @@ impl<'a> Token<'a> {
                 writeln!(out, "<stringConstant> {s} </stringConstant>").unwrap()
             }
         }
+    }
+}
+
+impl<'a> Token<'a> {
+    pub fn parse_next(s: &'a str) -> Option<(Self, &str)> {
+        let first_char = s.chars().next()?;
+        Some(if let Some((kw, new_rest)) = keyword_token(s) {
+            (Token::Keyword(kw), new_rest)
+        } else if let Some(new_rest) = s.strip_prefix([
+            '{', '}', '(', ')', '[', ']', '.', ',', ';', '+', '-', '*', '/', '&', '|', '<', '>',
+            '=', '~',
+        ]) {
+            (Token::Symbol(first_char), new_rest)
+        } else if let Some(new_rest) = s.strip_prefix('"') {
+            let (string_const, new_rest) = new_rest
+                .split_once('"')
+                .expect("String value not misses trailing `\"`");
+            (Token::StringConstant(string_const), new_rest)
+        } else if first_char.is_ascii_digit() {
+            let idx = s
+                .find(|c: char| !c.is_ascii_digit())
+                .expect("Trailing digit");
+            (Token::IntegerConstant(s[..idx].parse().unwrap()), &s[idx..])
+        } else {
+            let idx = s
+                .find(|c: char| !(c.is_ascii_alphanumeric() || c == '_'))
+                .expect("Unterminated identifier");
+            (Token::Identifier(&s[..idx]), &s[idx..])
+        })
     }
 }
 
@@ -64,40 +96,59 @@ fn keyword_token(s: &str) -> Option<(&str, &str)> {
     None
 }
 
-pub(crate) fn token_stream(s: &str) -> impl Iterator<Item = Token> + '_ {
-    let mut rest = s;
-    std::iter::from_fn(move || {
-        rest = rest.trim();
-        let first_char = rest.chars().next()?;
-        Some(if let Some((kw, new_rest)) = keyword_token(rest) {
-            rest = new_rest;
-            Token::Keyword(kw)
-        } else if let Some(new_rest) = rest.strip_prefix([
-            '{', '}', '(', ')', '[', ']', '.', ',', ';', '+', '-', '*', '/', '&', '|', '<', '>',
-            '=', '~',
-        ]) {
-            rest = new_rest;
-            Token::Symbol(first_char)
-        } else if let Some(new_rest) = rest.strip_prefix('"') {
-            let string_const;
-            (string_const, rest) = new_rest
-                .split_once('"')
-                .expect("String value not misses trailing `\"`");
-            Token::StringConstant(string_const)
-        } else if first_char.is_ascii_digit() {
-            let idx = rest
-                .find(|c: char| !c.is_ascii_digit())
-                .expect("Trailing digit");
-            let v = &rest[..idx];
-            rest = &rest[idx..];
-            Token::IntegerConstant(v.parse().unwrap())
-        } else {
-            let idx = rest
-                .find(|c: char| !(c.is_ascii_alphanumeric() || c == '_'))
-                .expect("Unterminated identifier");
-            let v = &rest[..idx];
-            rest = &rest[idx..];
-            Token::Identifier(v)
-        })
-    })
+pub struct TokenStream<'a> {
+    inner: Peekable<InnerTokenStream<'a>>,
+}
+
+impl<'a> Iterator for TokenStream<'a> {
+    type Item = Token<'a>;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+
+impl<'a> TokenStream<'a> {
+    pub fn new(s: &str) -> TokenStream {
+        let inner = InnerTokenStream { rest: s }.peekable();
+        TokenStream { inner }
+    }
+
+    pub fn peek(self: &mut Self) -> Option<&Token<'_>> {
+        self.inner.peek()
+    }
+}
+
+struct InnerTokenStream<'a> {
+    rest: &'a str,
+}
+
+// impl<'a, I> TokenStream<'a, I>
+// where
+//     I: Iterator<Item = Token<'a>>,
+// {
+//     fn next_assert(self: &mut Self, o: &Token) -> Token<'a> {
+//         let token = self.next().unwrap();
+//         assert_eq!(token, *o);
+//         token
+//     }
+
+//     fn next_keyword(self: &mut Self) -> &'a str {
+//         match self.next().unwrap() {
+//             Keyword(kw) => kw,
+//             _ => panic!(""),
+//         }
+//     }
+// }
+
+impl<'a> Iterator for InnerTokenStream<'a> {
+    type Item = Token<'a>;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        let result;
+        (result, self.rest) = Token::parse_next(self.rest.trim())?;
+        Some(result)
+    }
 }
