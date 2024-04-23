@@ -21,34 +21,53 @@ fn main() {
 
 #[cfg(test)]
 mod test {
-    use std::process::{Command, Stdio};
+    use std::{process::Command, str::from_utf8};
 
     use super::*;
 
-    // #[test]
-    // fn square_main() {
-    //     let path = Path::new("../Square/Main.jack");
-    //     let cargo_root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    //     let path = cargo_root.join(path);
-    //     compile_path(&path).unwrap();
-    //     check_file(&path.with_extension("xml"));
-    // }
-
     #[test]
-    fn test_all_tokens() {
-        check_tokens("../ArrayTest/Main.jack");
-        check_tokens("../ExpressionLessSquare/SquareGame.jack");
-        check_tokens("../Square/Main.jack");
-        check_tokens("../Square/Square.jack");
-        check_tokens("../ExpressionLessSquare/Main.jack");
-        check_tokens("../ExpressionLessSquare/Square.jack");
-        check_tokens("../Square/SquareGame.jack");
+    fn array_test() {
+        check_folder("../ArrayTest");
     }
 
-    /// Create xml output file and compare it to reference
-    fn check_tokens(jack_file: &str) {
+    #[test]
+    fn expressionless_square() {
+        check_folder("../ExpressionLessSquare");
+    }
+
+    #[test]
+    fn square() {
+        check_folder("../Square");
+    }
+
+    fn check_folder(s: &str) {
+        let path = Path::new(s);
         let cargo_root = Path::new(env!("CARGO_MANIFEST_DIR"));
-        let jack_file = cargo_root.join(jack_file);
+        let path = cargo_root.join(path);
+        for file in files_with_extension(&path, "jack") {
+            write_token_xml(&file);
+        }
+        compile_path(&path).unwrap();
+        for file in files_with_extension(&path.join("reference"), "xml") {
+            if file.file_stem().unwrap().to_str().unwrap().ends_with('T') {
+                check_file(&file)
+            }
+        }
+    }
+
+    fn files_with_extension<'a>(
+        path: &'a Path,
+        extension: &'a str,
+    ) -> impl Iterator<Item = PathBuf> + 'a {
+        fs::read_dir(&path).unwrap().filter_map(move |dir_entry| {
+            let file = dir_entry.unwrap().path();
+            file.extension()
+                .is_some_and(|e| e == extension)
+                .then_some(file)
+        })
+    }
+
+    fn write_token_xml(jack_file: &Path) -> PathBuf {
         let mut out_filename = jack_file.file_stem().unwrap().to_os_string();
         out_filename.push("T.xml");
         let out_filename = jack_file.with_file_name(out_filename);
@@ -59,30 +78,31 @@ mod test {
             token_stream(&filtered).for_each(|t| t.write_xml(&mut out));
             writeln!(out, "</tokens>").unwrap();
         }
-        // Make shure out is written
-        check_file(&out_filename);
+        out_filename
     }
 
-    /// Checks if file is equal to reference in subfolder `reference`
-    fn check_file(path: &Path) {
+    /// Checks that reference is equal to file in parent folder
+    fn check_file(reference: &Path) {
         let cargo_root = Path::new(env!("CARGO_MANIFEST_DIR"));
-        let path = cargo_root.join(path);
-        let reference = path
-            .parent()
+        let reference = cargo_root.join(reference);
+        let path = reference
+            .ancestors()
+            .nth(2)
             .unwrap()
-            .join("reference")
-            .join(path.file_name().unwrap());
+            .join(reference.file_name().unwrap());
+        let output = Command::new("bash")
+            .arg("../../../tools/TextComparer.sh")
+            .arg(path)
+            .arg(&reference)
+            .current_dir(cargo_root)
+            .output()
+            .expect("Failed to run TextComparer");
         assert!(
-            Command::new("bash")
-                .arg("../../../tools/TextComparer.sh")
-                .arg(path)
-                .arg(reference)
-                .current_dir(cargo_root)
-                .stdout(Stdio::null())
-                .status()
-                .expect("Failed to run TextComparer")
-                .success(),
-            "Bad status when running TextComparer"
+            output.status.success(),
+            "TextComparer failed for reference {}: {}{}",
+            reference.display(),
+            from_utf8(&output.stderr).unwrap(),
+            from_utf8(&output.stdout).unwrap()
         );
     }
 }
