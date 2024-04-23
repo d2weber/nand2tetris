@@ -1,6 +1,6 @@
 use std::{
     fs::{self, File},
-    io::BufWriter,
+    io::{BufWriter, Write},
     path::Path,
 };
 
@@ -31,7 +31,7 @@ pub(crate) fn compile_path(path: &Path) -> std::io::Result<()> {
     }
 }
 
-fn compile_file(jack_file: &Path, out: &mut impl std::io::Write) {
+fn compile_file(jack_file: &Path, out: &mut impl Write) {
     // let module_id = jack_file
     //     .file_stem()
     //     .unwrap_or_else(|| panic!("Expected *.jack file, got `{}`", jack_file.display()))
@@ -77,7 +77,7 @@ pub(crate) fn filter_comments(s: &str) -> String {
     filtered + rest
 }
 
-pub(crate) fn compile_class<'a>(out: &mut impl std::io::Write, tokens: &mut TokenStream) -> Res {
+pub(crate) fn compile_class<'a>(out: &mut impl Write, tokens: &mut TokenStream) -> Res {
     writeln!(out, "<class>").unwrap();
     tokens.next().unwrap().write_xml(out); // class
     tokens.next().unwrap().write_xml(out); // Identifier
@@ -111,10 +111,7 @@ pub(crate) fn compile_class<'a>(out: &mut impl std::io::Write, tokens: &mut Toke
     Ok(())
 }
 
-fn compile_class_variable_declaration<'a>(
-    out: &mut impl std::io::Write,
-    tokens: &mut TokenStream,
-) -> Res {
+fn compile_class_variable_declaration<'a>(out: &mut impl Write, tokens: &mut TokenStream) -> Res {
     writeln!(out, "<classVarDec>").unwrap();
     tokens.next().unwrap().write_xml(out); // field | static
     tokens.next().unwrap().write_xml(out); // type
@@ -134,7 +131,7 @@ fn compile_class_variable_declaration<'a>(
     writeln!(out, "</classVarDec>").unwrap();
     Ok(())
 }
-fn compile_subroutine<'a>(out: &mut impl std::io::Write, tokens: &mut TokenStream) -> Res {
+fn compile_subroutine<'a>(out: &mut impl Write, tokens: &mut TokenStream) -> Res {
     writeln!(out, "<subroutineDec>").unwrap();
     tokens.next().unwrap().write_xml(out); // constructor | function | method
     tokens.next().unwrap().write_xml(out); // type
@@ -168,68 +165,15 @@ fn compile_subroutine<'a>(out: &mut impl std::io::Write, tokens: &mut TokenStrea
     Ok(())
 }
 
-fn compile_statements<'a>(out: &mut impl std::io::Write, tokens: &mut TokenStream) -> Res {
+fn compile_statements(out: &mut impl Write, tokens: &mut TokenStream) -> Res {
     writeln!(out, "<statements>").unwrap();
     loop {
         match tokens.peek().unwrap() {
-            Keyword("let") => {
-                writeln!(out, "<letStatement>").unwrap();
-                tokens.next().unwrap().write_xml(out); // let
-                tokens.next().unwrap().write_xml(out); // identifier
-                if matches!(tokens.peek().unwrap(), Symbol('[')) {
-                    tokens.next().unwrap().write_xml(out); // [
-                    compile_expression(out, tokens)?;
-                    tokens.next().unwrap().write_xml(out); // ]
-                }
-                tokens.next().unwrap().write_xml(out); // =
-                compile_expression(out, tokens)?;
-                tokens.next().unwrap().write_xml(out); // ;
-                writeln!(out, "</letStatement>").unwrap();
-            }
-            Keyword("if") => {
-                writeln!(out, "<ifStatement>").unwrap();
-                tokens.next().unwrap().write_xml(out); // if
-                tokens.next().unwrap().write_xml(out); // (
-                compile_expression(out, tokens)?;
-                tokens.next().unwrap().write_xml(out); // )
-                tokens.next().unwrap().write_xml(out); // {
-                compile_statements(out, tokens)?;
-                tokens.next().unwrap().write_xml(out); // }
-                if matches!(tokens.peek().unwrap(), Keyword("else")) {
-                    tokens.next().unwrap().write_xml(out); // else
-                    tokens.next().unwrap().write_xml(out); // {
-                    compile_statements(out, tokens)?;
-                    tokens.next().unwrap().write_xml(out); // }
-                }
-                writeln!(out, "</ifStatement>").unwrap();
-            }
-            Keyword("while") => {
-                writeln!(out, "<whileStatement>").unwrap();
-                tokens.next().unwrap().write_xml(out); // while
-                tokens.next().unwrap().write_xml(out); // (
-                compile_expression(out, tokens)?;
-                tokens.next().unwrap().write_xml(out); // )
-                tokens.next().unwrap().write_xml(out); // {
-                compile_statements(out, tokens)?;
-                tokens.next().unwrap().write_xml(out); // }
-                writeln!(out, "</whileStatement>").unwrap();
-            }
-            Keyword("do") => {
-                writeln!(out, "<doStatement>").unwrap();
-                tokens.next().unwrap().write_xml(out); // do
-                compile_term_inner(out, tokens)?;
-                tokens.next().unwrap().write_xml(out); // ;
-                writeln!(out, "</doStatement>").unwrap();
-            }
-            Keyword("return") => {
-                writeln!(out, "<returnStatement>").unwrap();
-                tokens.next().unwrap().write_xml(out); // return
-                if !matches!(tokens.peek().unwrap(), Symbol(';')) {
-                    compile_expression(out, tokens)?;
-                }
-                tokens.next().unwrap().write_xml(out); // ;
-                writeln!(out, "</returnStatement>").unwrap();
-            }
+            Keyword("let") => compile_let(out, tokens)?,
+            Keyword("if") => compile_if(out, tokens)?,
+            Keyword("while") => compile_while(out, tokens)?,
+            Keyword("do") => compile_do(out, tokens)?,
+            Keyword("return") => compile_return(out, tokens)?,
             Symbol('}') => break,
             _ => return Err("Unexpected token in statements"),
         }
@@ -238,14 +182,82 @@ fn compile_statements<'a>(out: &mut impl std::io::Write, tokens: &mut TokenStrea
     Ok(())
 }
 
-fn compile_term<'a>(out: &mut impl std::io::Write, tokens: &mut TokenStream) -> Res {
+fn compile_return(out: &mut impl Write, tokens: &mut TokenStream) -> Res {
+    writeln!(out, "<returnStatement>").unwrap();
+    tokens.next().unwrap().write_xml(out);
+    if !matches!(tokens.peek().unwrap(), Symbol(';')) {
+        compile_expression(out, tokens)?;
+    }
+    tokens.next().unwrap().write_xml(out);
+    writeln!(out, "</returnStatement>").unwrap();
+    Ok(())
+}
+
+fn compile_do(out: &mut impl Write, tokens: &mut TokenStream<'_>) -> Res {
+    writeln!(out, "<doStatement>").unwrap();
+    tokens.next().unwrap().write_xml(out);
+    compile_term_inner(out, tokens)?;
+    tokens.next().unwrap().write_xml(out);
+    writeln!(out, "</doStatement>").unwrap();
+    Ok(())
+}
+
+fn compile_while(out: &mut impl Write, tokens: &mut TokenStream<'_>) -> Res {
+    writeln!(out, "<whileStatement>").unwrap();
+    tokens.next().unwrap().write_xml(out);
+    tokens.next().unwrap().write_xml(out);
+    compile_expression(out, tokens)?;
+    tokens.next().unwrap().write_xml(out);
+    tokens.next().unwrap().write_xml(out);
+    compile_statements(out, tokens)?;
+    tokens.next().unwrap().write_xml(out);
+    writeln!(out, "</whileStatement>").unwrap();
+    Ok(())
+}
+
+fn compile_if(out: &mut impl Write, tokens: &mut TokenStream<'_>) -> Res {
+    writeln!(out, "<ifStatement>").unwrap();
+    tokens.next().unwrap().write_xml(out);
+    tokens.next().unwrap().write_xml(out);
+    compile_expression(out, tokens)?;
+    tokens.next().unwrap().write_xml(out);
+    tokens.next().unwrap().write_xml(out);
+    compile_statements(out, tokens)?;
+    tokens.next().unwrap().write_xml(out);
+    if matches!(tokens.peek().unwrap(), Keyword("else")) {
+        tokens.next().unwrap().write_xml(out); // else
+        tokens.next().unwrap().write_xml(out); // {
+        compile_statements(out, tokens)?;
+        tokens.next().unwrap().write_xml(out); // }
+    }
+    writeln!(out, "</ifStatement>").unwrap();
+    Ok(())
+}
+
+fn compile_let(out: &mut impl Write, tokens: &mut TokenStream<'_>) -> Res {
+    writeln!(out, "<letStatement>").unwrap();
+    tokens.next().unwrap().write_xml(out);
+    tokens.next().unwrap().write_xml(out);
+    if matches!(tokens.peek().unwrap(), Symbol('[')) {
+        tokens.next().unwrap().write_xml(out); // [
+        compile_expression(out, tokens)?;
+        tokens.next().unwrap().write_xml(out); // ]
+    }
+    tokens.next().unwrap().write_xml(out);
+    compile_expression(out, tokens)?;
+    tokens.next().unwrap().write_xml(out);
+    writeln!(out, "</letStatement>").unwrap();
+    Ok(())
+}
+
+fn compile_term<'a>(out: &mut impl Write, tokens: &mut TokenStream) -> Res {
     writeln!(out, "<term>").unwrap();
     compile_term_inner(out, tokens)?;
     writeln!(out, "</term>").unwrap();
     Ok(())
 }
 
-fn compile_term_inner<'a>(out: &mut impl std::io::Write, tokens: &mut TokenStream) -> Res {
+fn compile_term_inner<'a>(out: &mut impl Write, tokens: &mut TokenStream) -> Res {
     let t1 = tokens.next().unwrap();
     t1.write_xml(out);
     Ok(match (&t1, tokens.peek().unwrap()) {
@@ -284,7 +296,7 @@ fn compile_term_inner<'a>(out: &mut impl std::io::Write, tokens: &mut TokenStrea
 }
 
 fn compile_expression_list<'a>(
-    out: &mut impl std::io::Write,
+    out: &mut impl Write,
     tokens: &mut TokenStream,
 ) -> Result<usize, &'static str> {
     writeln!(out, "<expressionList>").unwrap();
@@ -305,7 +317,7 @@ fn compile_expression_list<'a>(
     Ok(n)
 }
 
-fn compile_expression<'a>(out: &mut impl std::io::Write, tokens: &mut TokenStream) -> Res {
+fn compile_expression<'a>(out: &mut impl Write, tokens: &mut TokenStream) -> Res {
     writeln!(out, "<expression>").unwrap();
     compile_term(out, tokens)?;
     while matches!(
@@ -326,10 +338,7 @@ fn compile_expression<'a>(out: &mut impl std::io::Write, tokens: &mut TokenStrea
     writeln!(out, "</expression>").unwrap();
     Ok(())
 }
-fn compile_variable_declaration<'a>(
-    out: &mut impl std::io::Write,
-    tokens: &mut TokenStream,
-) -> Res {
+fn compile_variable_declaration<'a>(out: &mut impl Write, tokens: &mut TokenStream) -> Res {
     writeln!(out, "<varDec>").unwrap();
     loop {
         match tokens.peek().unwrap() {
