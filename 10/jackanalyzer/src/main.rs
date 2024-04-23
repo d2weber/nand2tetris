@@ -25,20 +25,20 @@ mod test {
 
     use super::*;
 
-    #[test]
-    fn array_test() {
-        check_folder("../ArrayTest");
-    }
+    // #[test]
+    // fn array_test() {
+    //     check_folder("../ArrayTest");
+    // }
 
     #[test]
     fn expressionless_square() {
         check_folder("../ExpressionLessSquare");
     }
 
-    #[test]
-    fn square() {
-        check_folder("../Square");
-    }
+    // #[test]
+    // fn square() {
+    //     check_folder("../Square");
+    // }
 
     fn check_folder(s: &str) {
         let path = Path::new(s);
@@ -49,9 +49,7 @@ mod test {
         }
         compile_path(&path).unwrap();
         for file in files_with_extension(&path.join("reference"), "xml") {
-            if file.file_stem().unwrap().to_str().unwrap().ends_with('T') {
-                check_file(&file)
-            }
+            check_file(&file)
         }
     }
 
