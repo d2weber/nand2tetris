@@ -26,20 +26,20 @@ mod test {
 
     use super::*;
 
-    // #[test]
-    // fn array_test() {
-    //     check_folder("../ArrayTest");
-    // }
+    #[test]
+    fn array_test() {
+        check_folder("../ArrayTest");
+    }
 
     #[test]
     fn expressionless_square() {
         check_folder("../ExpressionLessSquare");
     }
 
-    // #[test]
-    // fn square() {
-    //     check_folder("../Square");
-    // }
+    #[test]
+    fn square() {
+        check_folder("../Square");
+    }
 
     fn check_folder(s: &str) {
         let path = Path::new(s);
@@ -146,8 +146,6 @@ fn compile_file(jack_file: &Path, out: &mut impl Write) {
         out.flush().unwrap();
         panic!("Compilation failed: {e} ({})", jack_file.display());
     });
-    // out.write_all(filtered.as_bytes())
-    //     .expect("Failed to write output file");
 }
 
 type Res = Result<(), &'static str>;
@@ -398,6 +396,21 @@ fn compile_expression<'a>(
 ) -> Res {
     writeln!(out, "<expression>").unwrap();
     compile_term(out, tokens)?;
+    while matches!(
+        tokens.peek().unwrap(),
+        Symbol('+')
+            | Symbol('-')
+            | Symbol('*')
+            | Symbol('/')
+            | Symbol('&')
+            | Symbol('|')
+            | Symbol('<')
+            | Symbol('>')
+            | Symbol('=')
+    ) {
+        tokens.next().unwrap().write_xml(out);
+        compile_term(out, tokens)?;
+    }
     writeln!(out, "</expression>").unwrap();
     Ok(())
 }
@@ -413,7 +426,7 @@ fn compile_variable_declaration<'a>(
                 tokens.next().unwrap().write_xml(out); // type
                 tokens.next().unwrap().write_xml(out); // identifier
             }
-            Keyword(",") => {
+            Symbol(',') => {
                 tokens.next().unwrap().write_xml(out); // ,
                 tokens.next().unwrap().write_xml(out); // identifier
             }
