@@ -207,38 +207,32 @@ fn token_stream(s: &str) -> impl Iterator<Item = Token> + '_ {
         Some(if let Some((kw, new_rest)) = keyword_token(rest) {
             rest = new_rest;
             Token::Keyword(kw.to_owned())
+        } else if let Some(new_rest) = rest.strip_prefix([
+            '{', '}', '(', ')', '[', ']', '.', ',', ';', '+', '-', '*', '/', '&', '|', '<', '>',
+            '=', '~',
+        ]) {
+            rest = new_rest;
+            Token::Symbol(first_char)
+        } else if let Some(new_rest) = rest.strip_prefix('"') {
+            let string_const;
+            (string_const, rest) = new_rest
+                .split_once('"')
+                .expect("String value not misses trailing `\"`");
+            Token::StringConstant(string_const.to_owned())
+        } else if first_char.is_ascii_digit() {
+            let idx = rest
+                .find(|c: char| !c.is_ascii_digit())
+                .expect("Trailing digit");
+            let v = &rest[..idx];
+            rest = &rest[idx..];
+            Token::IntegerConstant(v.parse().unwrap())
         } else {
-            match first_char {
-                '{' | '}' | '(' | ')' | '[' | ']' | '.' | ',' | ';' | '+' | '-' | '*' | '/'
-                | '&' | '|' | '<' | '>' | '=' | '~' => {
-                    rest = &rest[1..];
-                    Token::Symbol(first_char)
-                }
-                '"' => {
-                    let (string_val, new_rest) = rest
-                        .strip_prefix('"')
-                        .and_then(|s| s.split_once('"'))
-                        .expect("String value not misses trailing `\"`");
-                    rest = new_rest;
-                    Token::StringConstant(string_val.to_owned())
-                }
-                _ if first_char.is_ascii_digit() => {
-                    let idx = rest
-                        .find(|c: char| !c.is_ascii_digit())
-                        .expect("Trailing digit");
-                    let v = &rest[..idx];
-                    rest = &rest[idx..];
-                    Token::IntegerConstant(v.parse().unwrap())
-                }
-                _ => {
-                    let idx = rest
-                        .find(|c: char| !(c.is_ascii_alphanumeric() || c == '_'))
-                        .expect("Unterminated identifier");
-                    let v = &rest[..idx];
-                    rest = &rest[idx..];
-                    Token::Identifier(v.to_owned())
-                }
-            }
+            let idx = rest
+                .find(|c: char| !(c.is_ascii_alphanumeric() || c == '_'))
+                .expect("Unterminated identifier");
+            let v = &rest[..idx];
+            rest = &rest[idx..];
+            Token::Identifier(v.to_owned())
         })
     })
 }
