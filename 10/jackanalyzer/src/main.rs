@@ -113,16 +113,16 @@ fn compile_path(path: &Path) -> std::io::Result<()> {
         compile_file(path, &mut out);
         Ok(())
     } else if path.is_dir() {
-        let name = path
-            .file_name()
-            .expect("Already checked that it's a directory");
-        let out_file = path.join(name).with_extension("xml");
-        let mut out = BufWriter::new(File::create(out_file)?);
         // TODO: Error when no jack file is found
         for dir_entry in fs::read_dir(path)? {
-            let file = dir_entry?.path();
-            if file.extension().is_some_and(|e| e == "jack") {
-                compile_file(&file, &mut out)
+            let jack_file = dir_entry?.path();
+            if jack_file.extension().is_some_and(|e| e == "jack") {
+                let name = jack_file
+                    .file_name()
+                    .expect("Already checked that it's a file");
+                let out_file = path.join(name).with_extension("xml");
+                let mut out = BufWriter::new(File::create(out_file)?);
+                compile_file(&jack_file, &mut out)
             }
         }
         Ok(())
