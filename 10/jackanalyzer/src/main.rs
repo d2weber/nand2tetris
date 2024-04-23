@@ -136,57 +136,307 @@ fn compile_file(jack_file: &Path, out: &mut impl Write) {
     //     .unwrap_or_else(|| panic!("Expected *.jack file, got `{}`", jack_file.display()))
     //     .to_str()
     //     .expect("Filename has to be unicode.");
-    let jack_file = fs::read_to_string(jack_file)
+    let s = fs::read_to_string(jack_file)
         .unwrap_or_else(|_| panic!("Couldn't read {}.", jack_file.display()));
 
-    let filtered = filter_comments(&jack_file);
+    let filtered = filter_comments(&s);
 
     let mut tokens = token_stream(&filtered).peekable();
-    compile_class(out, &mut tokens).unwrap();
+    compile_class(out, &mut tokens).unwrap_or_else(|e| {
+        out.flush().unwrap();
+        panic!("Compilation failed: {e} ({})", jack_file.display());
+    });
     // out.write_all(filtered.as_bytes())
     //     .expect("Failed to write output file");
 }
 
 type Res = Result<(), &'static str>;
+use Token::*;
 
-fn compile_class(out: &mut impl Write, tokens: &mut Peekable<impl Iterator<Item = Token>>) -> Res {
+fn compile_class<'a>(
+    out: &mut impl Write,
+    tokens: &mut Peekable<impl Iterator<Item = Token<'a>>>,
+) -> Res {
     writeln!(out, "<class>").unwrap();
     tokens.next().unwrap().write_xml(out); // class
     tokens.next().unwrap().write_xml(out); // Identifier
     tokens.next().unwrap().write_xml(out); // {
 
-    // match tokens.peek().unwrap() {
-    //     Token::Keyword(_) => todo!(),
-    //     Token::Symbol(_) => todo!(),
-    //     Token::Identifier(_) => todo!(),
-    //     Token::IntegerConstant(_) => todo!(),
-    //     Token::StringConstant(_) => todo!(),
-    // }
-    // compile_class_variable_declaration(out, tokens)?;
+    loop {
+        match tokens.peek().unwrap() {
+            Keyword("field") | Keyword("static") => {
+                compile_class_variable_declaration(out, tokens)?
+            }
+            Keyword("constructor") | Keyword("method") | Keyword("function") => {
+                break;
+            }
+            _ => return Err("Unexpected token in class variable declaration"),
+        }
+    }
 
+    loop {
+        match tokens.peek().unwrap() {
+            Keyword("constructor") | Keyword("method") | Keyword("function") => {
+                compile_subroutine(out, tokens)?
+            }
+            Symbol('}') => break,
+            _ => return Err("Unexpected token in class subroutine declaration"),
+        }
+    }
+
+    tokens.next().unwrap().write_xml(out); // }
     writeln!(out, "</class>").unwrap();
+    assert!(tokens.next().is_none(), "Should be consumed after class.");
     Ok(())
 }
 
-fn compile_class_variable_declaration(
+fn compile_class_variable_declaration<'a>(
     out: &mut impl Write,
-    tokens: &mut impl Iterator<Item = Token>,
+    tokens: &mut Peekable<impl Iterator<Item = Token<'a>>>,
 ) -> Res {
     writeln!(out, "<classVarDec>").unwrap();
+    tokens.next().unwrap().write_xml(out); // field | static
+    tokens.next().unwrap().write_xml(out); // type
+    tokens.next().unwrap().write_xml(out); // identifier
+    loop {
+        match tokens.peek().unwrap() {
+            Symbol(',') => {
+                tokens.next().unwrap().write_xml(out); // ,
+                tokens.next().unwrap().write_xml(out); // identifier
+            }
+            Symbol(';') => break,
+            _ => return Err("Unexpected token multi class variable declaration"),
+        }
+    }
+    tokens.next().unwrap().write_xml(out); // ;
 
     writeln!(out, "</classVarDec>").unwrap();
     Ok(())
 }
+fn compile_subroutine<'a>(
+    out: &mut impl Write,
+    tokens: &mut Peekable<impl Iterator<Item = Token<'a>>>,
+) -> Res {
+    writeln!(out, "<subroutineDec>").unwrap();
+    tokens.next().unwrap().write_xml(out); // constructor | function | method
+    tokens.next().unwrap().write_xml(out); // type
+    tokens.next().unwrap().write_xml(out); // identifier
+    tokens.next().unwrap().write_xml(out); // (
+    writeln!(out, "<parameterList>").unwrap();
+    loop {
+        match tokens.peek().unwrap() {
+            Keyword("int") | Keyword("char") | Identifier(_) => {
+                tokens.next().unwrap().write_xml(out); // type
+                tokens.next().unwrap().write_xml(out); // identifier
+            }
+            Symbol(',') => tokens.next().unwrap().write_xml(out),
+            Symbol(')') => break,
+            _ => return Err("Unexpected token in parameter list"),
+        }
+    }
+    writeln!(out, "</parameterList>").unwrap();
+    tokens.next().unwrap().write_xml(out); // )
+
+    writeln!(out, "<subroutineBody>").unwrap();
+    tokens.next().unwrap().write_xml(out); // {
+    while matches!(tokens.peek().unwrap(), Keyword("var")) {
+        compile_variable_declaration(out, tokens)?;
+    }
+    compile_statements(out, tokens)?;
+    tokens.next().unwrap().write_xml(out); // }
+    writeln!(out, "</subroutineBody>").unwrap();
+
+    writeln!(out, "</subroutineDec>").unwrap();
+    Ok(())
+}
+
+fn compile_statements<'a>(
+    out: &mut impl Write,
+    tokens: &mut Peekable<impl Iterator<Item = Token<'a>>>,
+) -> Res {
+    writeln!(out, "<statements>").unwrap();
+    loop {
+        match tokens.peek().unwrap() {
+            Keyword("let") => {
+                writeln!(out, "<letStatement>").unwrap();
+                tokens.next().unwrap().write_xml(out); // let
+                tokens.next().unwrap().write_xml(out); // identifier
+                if matches!(tokens.peek().unwrap(), Symbol('[')) {
+                    tokens.next().unwrap().write_xml(out); // [
+                    compile_expression(out, tokens)?;
+                    tokens.next().unwrap().write_xml(out); // ]
+                }
+                tokens.next().unwrap().write_xml(out); // =
+                compile_expression(out, tokens)?;
+                tokens.next().unwrap().write_xml(out); // ;
+                writeln!(out, "</letStatement>").unwrap();
+            }
+            Keyword("if") => {
+                writeln!(out, "<ifStatement>").unwrap();
+                tokens.next().unwrap().write_xml(out); // if
+                tokens.next().unwrap().write_xml(out); // (
+                compile_expression(out, tokens)?;
+                tokens.next().unwrap().write_xml(out); // )
+                tokens.next().unwrap().write_xml(out); // {
+                compile_statements(out, tokens)?;
+                tokens.next().unwrap().write_xml(out); // }
+                if matches!(tokens.peek().unwrap(), Keyword("else")) {
+                    tokens.next().unwrap().write_xml(out); // else
+                    tokens.next().unwrap().write_xml(out); // {
+                    compile_statements(out, tokens)?;
+                    tokens.next().unwrap().write_xml(out); // }
+                }
+                writeln!(out, "</ifStatement>").unwrap();
+            }
+            Keyword("while") => {
+                writeln!(out, "<whileStatement>").unwrap();
+                tokens.next().unwrap().write_xml(out); // while
+                tokens.next().unwrap().write_xml(out); // (
+                compile_expression(out, tokens)?;
+                tokens.next().unwrap().write_xml(out); // )
+                tokens.next().unwrap().write_xml(out); // {
+                compile_statements(out, tokens)?;
+                tokens.next().unwrap().write_xml(out); // }
+                writeln!(out, "</whileStatement>").unwrap();
+            }
+            Keyword("do") => {
+                writeln!(out, "<doStatement>").unwrap();
+                tokens.next().unwrap().write_xml(out); // do
+                compile_term_inner(out, tokens)?;
+                tokens.next().unwrap().write_xml(out); // ;
+                writeln!(out, "</doStatement>").unwrap();
+            }
+            Keyword("return") => {
+                writeln!(out, "<returnStatement>").unwrap();
+                tokens.next().unwrap().write_xml(out); // return
+                if !matches!(tokens.peek().unwrap(), Symbol(';')) {
+                    compile_expression(out, tokens)?;
+                }
+                tokens.next().unwrap().write_xml(out); // ;
+                writeln!(out, "</returnStatement>").unwrap();
+            }
+            Symbol('}') => break,
+            _ => return Err("Unexpected token in statements"),
+        }
+    }
+    writeln!(out, "</statements>").unwrap();
+    Ok(())
+}
+
+fn compile_term<'a>(
+    out: &mut impl Write,
+    tokens: &mut Peekable<impl Iterator<Item = Token<'a>>>,
+) -> Res {
+    writeln!(out, "<term>").unwrap();
+    compile_term_inner(out, tokens)?;
+    writeln!(out, "</term>").unwrap();
+    Ok(())
+}
+
+fn compile_term_inner<'a>(
+    out: &mut impl Write,
+    tokens: &mut Peekable<impl Iterator<Item = Token<'a>>>,
+) -> Res {
+    let t1 = tokens.next().unwrap();
+    t1.write_xml(out);
+    Ok(match (&t1, tokens.peek().unwrap()) {
+        (
+            IntegerConstant(_) | StringConstant(_) | Keyword("true") | Keyword("false")
+            | Keyword("null") | Keyword("this"),
+            _,
+        ) => (),
+        (Identifier(_), Symbol('[')) => {
+            tokens.next().unwrap().write_xml(out); // [
+            compile_expression(out, tokens)?;
+            tokens.next().unwrap().write_xml(out); // ]
+        }
+        (Symbol('('), _) => {
+            compile_expression(out, tokens)?;
+            tokens.next().unwrap().write_xml(out); // )
+        }
+        (Symbol('-') | Symbol('~'), _) => {
+            compile_term(out, tokens)?;
+        }
+        (Identifier(_), Symbol('(')) => {
+            tokens.next().unwrap().write_xml(out); // (
+            compile_expression_list(out, tokens)?;
+            tokens.next().unwrap().write_xml(out); // )
+        }
+        (Identifier(_), Symbol('.')) => {
+            tokens.next().unwrap().write_xml(out); // .
+            tokens.next().unwrap().write_xml(out); // identifier
+            tokens.next().unwrap().write_xml(out); // (
+            compile_expression_list(out, tokens)?;
+            tokens.next().unwrap().write_xml(out); // )
+        }
+        (Identifier(_), _) => (),
+        _ => return Err("Unexpected token in term"),
+    })
+}
+
+fn compile_expression_list<'a>(
+    out: &mut impl Write,
+    tokens: &mut Peekable<impl Iterator<Item = Token<'a>>>,
+) -> Res {
+    writeln!(out, "<expressionList>").unwrap();
+    loop {
+        match tokens.peek().unwrap() {
+            Symbol(',') => {
+                tokens.next().unwrap().write_xml(out); // ,
+            }
+            Symbol(')') => break,
+            _ => compile_expression(out, tokens)?,
+        }
+    }
+    writeln!(out, "</expressionList>").unwrap();
+    Ok(())
+}
+
+fn compile_expression<'a>(
+    out: &mut impl Write,
+    tokens: &mut Peekable<impl Iterator<Item = Token<'a>>>,
+) -> Res {
+    writeln!(out, "<expression>").unwrap();
+    compile_term(out, tokens)?;
+    writeln!(out, "</expression>").unwrap();
+    Ok(())
+}
+fn compile_variable_declaration<'a>(
+    out: &mut impl Write,
+    tokens: &mut Peekable<impl Iterator<Item = Token<'a>>>,
+) -> Res {
+    writeln!(out, "<varDec>").unwrap();
+    loop {
+        match tokens.peek().unwrap() {
+            Keyword("var") => {
+                tokens.next().unwrap().write_xml(out); // var
+                tokens.next().unwrap().write_xml(out); // type
+                tokens.next().unwrap().write_xml(out); // identifier
+            }
+            Keyword(",") => {
+                tokens.next().unwrap().write_xml(out); // ,
+                tokens.next().unwrap().write_xml(out); // identifier
+            }
+            Symbol(';') => {
+                tokens.next().unwrap().write_xml(out); // ;
+                break;
+            }
+            _ => return Err("Unexpected token in variable declaration"),
+        }
+    }
+    writeln!(out, "</varDec>").unwrap();
+    Ok(())
+}
 
 #[derive(Debug, PartialEq)]
-enum Token {
-    Keyword(String),
+enum Token<'a> {
+    Keyword(&'a str),
     Symbol(char),
-    Identifier(String),
+    Identifier(&'a str),
     IntegerConstant(i32),
-    StringConstant(String),
+    StringConstant(&'a str),
 }
-impl Token {
+impl<'a> Token<'a> {
     fn write_xml(&self, out: &mut impl Write) {
         match self {
             Token::Keyword(s) => writeln!(out, "<keyword> {s} </keyword>").unwrap(),
@@ -251,7 +501,7 @@ fn token_stream(s: &str) -> impl Iterator<Item = Token> + '_ {
         let first_char = rest.chars().next()?;
         Some(if let Some((kw, new_rest)) = keyword_token(rest) {
             rest = new_rest;
-            Token::Keyword(kw.to_owned())
+            Token::Keyword(kw)
         } else if let Some(new_rest) = rest.strip_prefix([
             '{', '}', '(', ')', '[', ']', '.', ',', ';', '+', '-', '*', '/', '&', '|', '<', '>',
             '=', '~',
@@ -263,7 +513,7 @@ fn token_stream(s: &str) -> impl Iterator<Item = Token> + '_ {
             (string_const, rest) = new_rest
                 .split_once('"')
                 .expect("String value not misses trailing `\"`");
-            Token::StringConstant(string_const.to_owned())
+            Token::StringConstant(string_const)
         } else if first_char.is_ascii_digit() {
             let idx = rest
                 .find(|c: char| !c.is_ascii_digit())
@@ -277,7 +527,7 @@ fn token_stream(s: &str) -> impl Iterator<Item = Token> + '_ {
                 .expect("Unterminated identifier");
             let v = &rest[..idx];
             rest = &rest[idx..];
-            Token::Identifier(v.to_owned())
+            Token::Identifier(v)
         })
     })
 }
