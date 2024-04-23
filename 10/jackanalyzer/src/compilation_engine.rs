@@ -305,19 +305,23 @@ fn compile_term_inner<'a>(
 fn compile_expression_list<'a>(
     out: &mut impl std::io::Write,
     tokens: &mut Peekable<impl Iterator<Item = Token<'a>>>,
-) -> Res {
+) -> Result<usize, &'static str> {
     writeln!(out, "<expressionList>").unwrap();
+    let mut n = 0;
     loop {
         match tokens.peek().unwrap() {
             Symbol(',') => {
                 tokens.next().unwrap().write_xml(out); // ,
             }
             Symbol(')') => break,
-            _ => compile_expression(out, tokens)?,
+            _ => {
+                n += 1;
+                compile_expression(out, tokens)?
+            }
         }
     }
     writeln!(out, "</expressionList>").unwrap();
-    Ok(())
+    Ok(n)
 }
 
 fn compile_expression<'a>(
