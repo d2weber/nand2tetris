@@ -32,6 +32,12 @@ impl<'a> Token<'a> {
 }
 
 impl<'a> Token<'a> {
+    fn from(s: &'a str) -> Self {
+        let (token, rest) = Self::parse_next(s).unwrap();
+        assert!(rest.is_empty());
+        token
+    }
+
     pub fn parse_next(s: &'a str) -> Option<(Self, &str)> {
         let first_char = s.chars().next()?;
         Some(if let Some((kw, new_rest)) = keyword_token(s) {
@@ -124,23 +130,13 @@ struct InnerTokenStream<'a> {
     rest: &'a str,
 }
 
-// impl<'a, I> TokenStream<'a, I>
-// where
-//     I: Iterator<Item = Token<'a>>,
-// {
-//     fn next_assert(self: &mut Self, o: &Token) -> Token<'a> {
-//         let token = self.next().unwrap();
-//         assert_eq!(token, *o);
-//         token
-//     }
-
-//     fn next_keyword(self: &mut Self) -> &'a str {
-//         match self.next().unwrap() {
-//             Keyword(kw) => kw,
-//             _ => panic!(""),
-//         }
-//     }
-// }
+impl<'a> TokenStream<'a> {
+    pub fn next_assert(self: &mut Self, s: &str) -> Token<'a> {
+        let token = self.next().unwrap();
+        assert_eq!(token, Token::from(s));
+        token
+    }
+}
 
 impl<'a> Iterator for InnerTokenStream<'a> {
     type Item = Token<'a>;
