@@ -45,7 +45,8 @@ fn compile_file(jack_file: &Path, out: &mut impl Write) {
     let filtered = filter_comments(&s);
 
     let tokens = TokenStream::new(&filtered);
-    CompilationEngine::new(out, tokens)
+    let class_name = jack_file.file_stem().unwrap().to_str().unwrap();
+    CompilationEngine::new(out, tokens, class_name)
         .compile_class()
         .unwrap_or_else(|e| {
             out.flush().unwrap();
@@ -85,12 +86,18 @@ struct CompilationEngine<'a, Writer> {
     out: &'a mut Writer,
     tokens: TokenStream<'a>,
     sym: SymbolTable<'a>,
+    class_name: &'a str,
 }
 
 impl<'a, Writer: Write> CompilationEngine<'a, Writer> {
-    fn new(out: &'a mut Writer, tokens: TokenStream<'a>) -> Self {
+    fn new(out: &'a mut Writer, tokens: TokenStream<'a>, class_name: &'a str) -> Self {
         let sym = SymbolTable::new();
-        CompilationEngine { out, tokens, sym }
+        CompilationEngine {
+            out,
+            tokens,
+            sym,
+            class_name,
+        }
     }
 
     fn compile_class(&mut self) -> Res {
@@ -161,9 +168,10 @@ impl<'a, Writer: Write> CompilationEngine<'a, Writer> {
 
     fn compile_subroutine(self: &mut Self) -> Res {
         writeln!(self.out, "// <subroutineDec>").unwrap();
-        self.tokens.next().unwrap().write_xml(self.out); // constructor | function | method
-        self.tokens.next().unwrap().write_xml(self.out); // type
-        self.tokens.next().unwrap().write_xml(self.out); // identifier
+        let proc_cat = self.tokens.unwrap_keyword();
+        assert!(matches!(proc_cat, "constructor" | "method" | "function"));
+        let is_void = self.tokens.unwrap_keyword_or_identifier() == "void";
+        let proc_name = self.tokens.unwrap_ident();
         self.tokens.next().unwrap().write_xml(self.out); // (
         writeln!(self.out, "// <parameterList>").unwrap();
         loop {
@@ -185,6 +193,18 @@ impl<'a, Writer: Write> CompilationEngine<'a, Writer> {
         self.tokens.next().unwrap().write_xml(self.out); // {
         while matches!(self.tokens.peek().unwrap(), Keyword("var")) {
             self.compile_variable_declaration()?;
+        }
+        writeln!(
+            self.out,
+            "function {class_name}.{proc_name} {n_vars}",
+            class_name = self.class_name,
+            n_vars = self.sym.n_vars()
+        )
+        .unwrap();
+
+        if proc_cat == "method" {
+            writeln!(self.out, "push argument 0").unwrap();
+            writeln!(self.out, "pop pointer 0").unwrap();
         }
         self.compile_statements()?;
         self.tokens.next().unwrap().write_xml(self.out); // }

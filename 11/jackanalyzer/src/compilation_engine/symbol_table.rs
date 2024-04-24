@@ -67,4 +67,12 @@ impl<'a> SymbolTable<'a> {
         self.n_args = 0;
         self.n_vars = 0;
     }
+
+    pub fn n_vars(&self) -> usize {
+        self.n_vars
+    }
+
+    pub fn n_args(&self) -> usize {
+        self.n_args
+    }
 }
