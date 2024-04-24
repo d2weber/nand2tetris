@@ -9,7 +9,7 @@ type Res = Result<(), &'static str>;
 
 pub(crate) fn compile_path(path: &Path) -> std::io::Result<()> {
     if path.is_file() {
-        let mut out = BufWriter::new(File::create(path.with_extension("xml"))?);
+        let mut out = BufWriter::new(File::create(path.with_extension("vm"))?);
         compile_file(path, &mut out);
         Ok(())
     } else if path.is_dir() {
@@ -20,7 +20,7 @@ pub(crate) fn compile_path(path: &Path) -> std::io::Result<()> {
                 let name = jack_file
                     .file_name()
                     .expect("Already checked that it's a file");
-                let out_file = path.join(name).with_extension("xml");
+                let out_file = path.join(name).with_extension("vm");
                 let mut out = BufWriter::new(File::create(out_file)?);
                 compile_file(&jack_file, &mut out)
             }
