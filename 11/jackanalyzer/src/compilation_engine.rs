@@ -202,11 +202,29 @@ impl<'a, Writer: Write> CompilationEngine<'a, Writer> {
         )
         .unwrap();
 
-        if proc_cat == "method" {
-            writeln!(self.out, "push argument 0").unwrap();
-            writeln!(self.out, "pop pointer 0").unwrap();
+        match proc_cat {
+            "method" => {
+                writeln!(self.out, "push argument 0").unwrap();
+                writeln!(self.out, "pop pointer 0").unwrap();
+            }
+            "constructor" => {
+                let n_fields = self.sym.n_fields();
+                writeln!(self.out, "push constant {n_fields}",).unwrap();
+                writeln!(self.out, "call Memory.alloc 1").unwrap();
+                writeln!(self.out, "pop pointer 0").unwrap();
+            }
+            _ => (),
         }
+
         self.compile_statements()?;
+
+        if is_void {
+            writeln!(self.out, "push constant 0").unwrap();
+        } else if proc_cat == "constructor" {
+            writeln!(self.out, "push pointer 0").unwrap();
+        }
+        writeln!(self.out, "return").unwrap();
+
         self.tokens.next().unwrap().write_xml(self.out); // }
         writeln!(self.out, "// </subroutineBody>").unwrap();
 
