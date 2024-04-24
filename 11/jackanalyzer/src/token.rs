@@ -12,20 +12,20 @@ pub enum Token<'a> {
 impl<'a> Token<'a> {
     pub(crate) fn write_xml(&self, out: &mut impl std::io::Write) {
         match self {
-            Token::Keyword(s) => writeln!(out, "<keyword> {s} </keyword>").unwrap(),
+            Token::Keyword(s) => writeln!(out, "// <keyword> {s} </keyword>").unwrap(),
             Token::Symbol(s) => match s {
-                '<' => writeln!(out, "<symbol> &lt; </symbol>"),
-                '>' => writeln!(out, "<symbol> &gt; </symbol>"),
-                '&' => writeln!(out, "<symbol> &amp; </symbol>"),
-                s => writeln!(out, "<symbol> {s} </symbol>"),
+                '<' => writeln!(out, "// <symbol> &lt; </symbol>"),
+                '>' => writeln!(out, "// <symbol> &gt; </symbol>"),
+                '&' => writeln!(out, "// <symbol> &amp; </symbol>"),
+                s => writeln!(out, "// <symbol> {s} </symbol>"),
             }
             .unwrap(),
-            Token::Identifier(s) => writeln!(out, "<identifier> {s} </identifier>").unwrap(),
+            Token::Identifier(s) => writeln!(out, "// <identifier> {s} </identifier>").unwrap(),
             Token::IntegerConstant(s) => {
-                writeln!(out, "<integerConstant> {s} </integerConstant>").unwrap()
+                writeln!(out, "// <integerConstant> {s} </integerConstant>").unwrap()
             }
             Token::StringConstant(s) => {
-                writeln!(out, "<stringConstant> {s} </stringConstant>").unwrap()
+                writeln!(out, "// <stringConstant> {s} </stringConstant>").unwrap()
             }
         }
     }
