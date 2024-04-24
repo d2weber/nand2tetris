@@ -1,3 +1,5 @@
+mod symbol_table;
+
 use std::{
     fs::{self, File},
     io::{BufWriter, Write},
@@ -5,6 +7,8 @@ use std::{
 };
 
 use crate::token::{Token::*, TokenStream};
+
+use self::symbol_table::SymbolTable;
 type Res = Result<(), &'static str>;
 
 pub(crate) fn compile_path(path: &Path) -> std::io::Result<()> {
@@ -32,18 +36,13 @@ pub(crate) fn compile_path(path: &Path) -> std::io::Result<()> {
 }
 
 fn compile_file(jack_file: &Path, out: &mut impl Write) {
-    // let module_id = jack_file
-    //     .file_stem()
-    //     .unwrap_or_else(|| panic!("Expected *.jack file, got `{}`", jack_file.display()))
-    //     .to_str()
-    //     .expect("Filename has to be unicode.");
     let s = fs::read_to_string(jack_file)
         .unwrap_or_else(|_| panic!("Couldn't read {}.", jack_file.display()));
 
     let filtered = filter_comments(&s);
 
     let tokens = TokenStream::new(&filtered);
-    CompilationEngine { out, tokens }
+    CompilationEngine::new(out, tokens)
         .compile_class()
         .unwrap_or_else(|e| {
             out.flush().unwrap();
@@ -82,9 +81,21 @@ pub(crate) fn filter_comments(s: &str) -> String {
 struct CompilationEngine<'a, Writer> {
     out: &'a mut Writer,
     tokens: TokenStream<'a>,
+    sym_class: SymbolTable<'a>,
+    sym_proc: Option<SymbolTable<'a>>,
 }
 
 impl<'a, Writer: Write> CompilationEngine<'a, Writer> {
+    fn new(out: &'a mut Writer, tokens: TokenStream<'a>) -> Self {
+        let sym_class = SymbolTable::new();
+        CompilationEngine {
+            out,
+            tokens,
+            sym_class,
+            sym_proc: None,
+        }
+    }
+
     fn compile_class(&mut self) -> Res {
         writeln!(self.out, "<class>").unwrap();
         self.tokens.next().unwrap().write_xml(self.out); // class
