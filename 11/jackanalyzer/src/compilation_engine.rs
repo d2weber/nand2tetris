@@ -6,7 +6,10 @@ use std::{
     path::Path,
 };
 
-use crate::token::{Token::*, TokenStream};
+use crate::{
+    compilation_engine::symbol_table::IdentCat,
+    token::{Token::*, TokenStream},
+};
 
 use self::symbol_table::SymbolTable;
 type Res = Result<(), &'static str>;
@@ -81,19 +84,13 @@ pub(crate) fn filter_comments(s: &str) -> String {
 struct CompilationEngine<'a, Writer> {
     out: &'a mut Writer,
     tokens: TokenStream<'a>,
-    sym_class: SymbolTable<'a>,
-    sym_proc: Option<SymbolTable<'a>>,
+    sym: SymbolTable<'a>,
 }
 
 impl<'a, Writer: Write> CompilationEngine<'a, Writer> {
     fn new(out: &'a mut Writer, tokens: TokenStream<'a>) -> Self {
-        let sym_class = SymbolTable::new();
-        CompilationEngine {
-            out,
-            tokens,
-            sym_class,
-            sym_proc: None,
-        }
+        let sym = SymbolTable::new();
+        CompilationEngine { out, tokens, sym }
     }
 
     fn compile_class(&mut self) -> Res {
@@ -122,6 +119,7 @@ impl<'a, Writer: Write> CompilationEngine<'a, Writer> {
                 Symbol('}') => break,
                 _ => return Err("Unexpected token in class subroutine declaration"),
             }
+            self.sym.reset_vars_and_args();
         }
 
         self.tokens.next().unwrap().write_xml(self.out); // }
@@ -135,14 +133,21 @@ impl<'a, Writer: Write> CompilationEngine<'a, Writer> {
 
     fn compile_class_variable_declaration(self: &mut Self) -> Res {
         writeln!(self.out, "<classVarDec>").unwrap();
-        self.tokens.next().unwrap().write_xml(self.out); // field | static
-        self.tokens.next().unwrap().write_xml(self.out); // type
-        self.tokens.next().unwrap().write_xml(self.out); // identifier
+        let cat = match self.tokens.unwrap_keyword() {
+            "field" => IdentCat::Field,
+            "static" => IdentCat::Static,
+            _ => return Err("Expected field or static"),
+        };
+
+        let typ = self.tokens.unwrap_keyword_or_identifier();
+        let name = self.tokens.unwrap_ident();
+        self.sym.insert(name, cat, typ);
         loop {
             match self.tokens.peek().unwrap() {
                 Symbol(',') => {
                     self.tokens.next().unwrap().write_xml(self.out); // ,
-                    self.tokens.next().unwrap().write_xml(self.out); // identifier
+                    let name = self.tokens.unwrap_ident();
+                    self.sym.insert(name, cat, typ);
                 }
                 Symbol(';') => break,
                 _ => return Err("Unexpected token multi class variable declaration"),
@@ -164,8 +169,9 @@ impl<'a, Writer: Write> CompilationEngine<'a, Writer> {
         loop {
             match self.tokens.peek().unwrap() {
                 Keyword("int") | Keyword("char") | Identifier(_) => {
-                    self.tokens.next().unwrap().write_xml(self.out); // type
-                    self.tokens.next().unwrap().write_xml(self.out); // identifier
+                    let typ = self.tokens.unwrap_keyword_or_identifier();
+                    let name = self.tokens.unwrap_ident();
+                    self.sym.insert(name, IdentCat::Arg, typ);
                 }
                 Symbol(',') => self.tokens.next().unwrap().write_xml(self.out),
                 Symbol(')') => break,
@@ -363,9 +369,10 @@ impl<'a, Writer: Write> CompilationEngine<'a, Writer> {
         loop {
             match self.tokens.peek().unwrap() {
                 Keyword("var") => {
-                    self.tokens.next().unwrap().write_xml(self.out); // var
-                    self.tokens.next().unwrap().write_xml(self.out); // type
-                    self.tokens.next().unwrap().write_xml(self.out); // identifier
+                    assert!(matches!(self.tokens.next().unwrap(), Keyword("var")));
+                    let typ = self.tokens.unwrap_keyword_or_identifier();
+                    let name = self.tokens.unwrap_ident();
+                    self.sym.insert(name, IdentCat::Var, typ);
                 }
                 Symbol(',') => {
                     self.tokens.next().unwrap().write_xml(self.out); // ,

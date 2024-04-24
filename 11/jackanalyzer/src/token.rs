@@ -115,8 +115,30 @@ impl<'a> TokenStream<'a> {
         TokenStream { inner }
     }
 
-    pub fn peek(self: &mut Self) -> Option<&Token<'_>> {
+    pub fn peek(&mut self) -> Option<&Token<'_>> {
         self.inner.peek()
+    }
+
+    pub(crate) fn unwrap_keyword(&mut self) -> &'a str {
+        match self.next().unwrap() {
+            Token::Keyword(kw) => kw,
+            v => panic!("Expected keyword, got {v:?}"),
+        }
+    }
+
+    pub(crate) fn unwrap_keyword_or_identifier(&mut self) -> &'a str {
+        match self.next().unwrap() {
+            Token::Keyword(kw) => kw,
+            Token::Identifier(ident) => ident,
+            v => panic!("Expected keyword or identifier, got {v:?}"),
+        }
+    }
+
+    pub(crate) fn unwrap_ident(&mut self) -> &'a str {
+        match self.next().unwrap() {
+            Token::Identifier(ident) => ident,
+            v => panic!("Expected identifier, got {v:?}"),
+        }
     }
 }
 

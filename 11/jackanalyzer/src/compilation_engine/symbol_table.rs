@@ -2,14 +2,9 @@ use std::collections::HashMap;
 
 type Name = str;
 type Index = usize;
+type IdentType = str;
 
-pub enum IdentType<'a> {
-    Int,
-    Boolean,
-    Char,
-    Class(&'a str),
-}
-
+#[derive(Clone, Copy, Debug)]
 pub enum IdentCat {
     Field,
     Static,
@@ -17,8 +12,9 @@ pub enum IdentCat {
     Arg,
 }
 
+#[derive(Debug)]
 pub struct SymbolTable<'a> {
-    inner: HashMap<&'a Name, (IdentType<'a>, IdentCat, Index)>,
+    inner: HashMap<&'a Name, (IdentCat, &'a IdentType, Index)>,
     n_fields: usize,
     n_statics: usize,
     n_vars: usize,
@@ -36,15 +32,39 @@ impl<'a> SymbolTable<'a> {
         }
     }
 
-    fn insert(self: &mut Self, name: &'a str, typ: IdentType<'a>, cat: IdentCat) {
-        let idx: &mut Index = &mut match cat {
-            IdentCat::Field => self.n_fields,
-            IdentCat::Static => self.n_statics,
-            IdentCat::Var => self.n_vars,
-            IdentCat::Arg => self.n_args,
+    pub fn insert(&mut self, name: &'a str, cat: IdentCat, typ: &'a IdentType) {
+        let idx = match cat {
+            IdentCat::Field => {
+                let tmp = self.n_fields;
+                self.n_fields += 1;
+                tmp
+            }
+            IdentCat::Static => {
+                let tmp = self.n_statics;
+                self.n_statics += 1;
+                tmp
+            }
+            IdentCat::Var => {
+                let tmp = self.n_vars;
+                self.n_vars += 1;
+                tmp
+            }
+            IdentCat::Arg => {
+                let tmp = self.n_args;
+                self.n_args += 1;
+                tmp
+            }
         };
-        let old = self.inner.insert(name, (typ, cat, *idx));
-        *idx += 1;
+        let old = self.inner.insert(name, (cat, typ, idx));
         assert!(old.is_none(), "Inserting {name} twice");
+    }
+
+    pub fn reset_vars_and_args(&mut self) {
+        self.inner.retain(|_, v| match v {
+            (IdentCat::Field | IdentCat::Static, _, _) => true,
+            (IdentCat::Var | IdentCat::Arg, _, _) => false,
+        });
+        self.n_args = 0;
+        self.n_vars = 0;
     }
 }
