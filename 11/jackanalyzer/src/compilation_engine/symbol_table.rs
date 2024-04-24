@@ -4,7 +4,7 @@ type Name = str;
 type Index = usize;
 type IdentType = str;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub enum IdentCat {
     Field,
     Static,
@@ -14,7 +14,7 @@ pub enum IdentCat {
 
 #[derive(Debug)]
 pub struct SymbolTable<'a> {
-    inner: HashMap<&'a Name, (IdentCat, &'a IdentType, Index)>,
+    inner: HashMap<(IdentCat, &'a Name), (&'a IdentType, Index)>,
     n_fields: usize,
     n_statics: usize,
     n_vars: usize,
@@ -55,14 +55,14 @@ impl<'a> SymbolTable<'a> {
                 tmp
             }
         };
-        let old = self.inner.insert(name, (cat, typ, idx));
+        let old = self.inner.insert((cat, name), (typ, idx));
         assert!(old.is_none(), "Inserting {name} twice");
     }
 
     pub fn reset_vars_and_args(&mut self) {
-        self.inner.retain(|_, v| match v {
-            (IdentCat::Field | IdentCat::Static, _, _) => true,
-            (IdentCat::Var | IdentCat::Arg, _, _) => false,
+        self.inner.retain(|(cat, _), _| match cat {
+            IdentCat::Field | IdentCat::Static => true,
+            IdentCat::Var | IdentCat::Arg => false,
         });
         self.n_args = 0;
         self.n_vars = 0;
