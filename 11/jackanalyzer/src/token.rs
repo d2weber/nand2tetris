@@ -42,6 +42,13 @@ impl<'a> Token<'a> {
             v => panic!("Expected keyword, got {v:?}"),
         }
     }
+
+    pub fn unwrap_symbol(&self) -> char {
+        match self {
+            Token::Symbol(s) => *s,
+            v => panic!("Expected symbol, got {v:?}"),
+        }
+    }
 }
 
 impl<'a> Token<'a> {
@@ -132,16 +139,12 @@ impl<'a> TokenStream<'a> {
         self.inner.peek()
     }
 
-    pub(crate) fn unwrap_keyword(&mut self) -> &'a str {
-        self.next().unwrap().unwrap_keyword()
+    pub(crate) fn unwrap_symbol(&mut self) -> char {
+        self.next().unwrap().unwrap_symbol()
     }
 
-    pub(crate) fn unwrap_keyword_or_identifier(&mut self) -> &'a str {
-        match self.next().unwrap() {
-            Token::Keyword(kw) => kw,
-            Token::Identifier(ident) => ident,
-            v => panic!("Expected keyword or identifier, got {v:?}"),
-        }
+    pub(crate) fn unwrap_keyword(&mut self) -> &'a str {
+        self.next().unwrap().unwrap_keyword()
     }
 
     pub(crate) fn unwrap_identifier(&mut self) -> &'a str {

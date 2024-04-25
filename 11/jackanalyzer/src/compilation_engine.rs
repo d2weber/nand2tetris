@@ -87,6 +87,7 @@ struct CompilationEngine<'a, Writer> {
     tokens: TokenStream<'a>,
     sym: SymbolTable<'a>,
     class_name: &'a str,
+    _uid: usize,
 }
 
 impl<'a, Writer: Write> CompilationEngine<'a, Writer> {
@@ -97,6 +98,7 @@ impl<'a, Writer: Write> CompilationEngine<'a, Writer> {
             tokens,
             sym,
             class_name,
+            _uid: 0,
         }
     }
 
@@ -168,11 +170,17 @@ impl<'a, Writer: Write> CompilationEngine<'a, Writer> {
 
     fn compile_subroutine(self: &mut Self) -> Res {
         writeln!(self.out, "// <subroutineDec>").unwrap();
+
         let proc_cat = self.tokens.unwrap_keyword();
         assert!(matches!(proc_cat, "constructor" | "method" | "function"));
-        let is_void = self.tokens.unwrap_keyword_or_identifier() == "void";
+        let return_type = self.tokens.next().unwrap();
         let proc_name = self.tokens.unwrap_identifier();
-        self.tokens.next().unwrap().write_xml(self.out); // (
+
+        if proc_cat == "method" {
+            self.sym.insert("this", IdentCat::Arg, return_type.clone())
+        }
+
+        assert_eq!(self.tokens.unwrap_symbol(), '(');
         writeln!(self.out, "// <parameterList>").unwrap();
         loop {
             match self.tokens.peek().unwrap() {
@@ -181,7 +189,9 @@ impl<'a, Writer: Write> CompilationEngine<'a, Writer> {
                     let name = self.tokens.unwrap_identifier();
                     self.sym.insert(name, IdentCat::Arg, typ);
                 }
-                Symbol(',') => self.tokens.next().unwrap().write_xml(self.out),
+                Symbol(',') => {
+                    self.tokens.next().unwrap();
+                }
                 Symbol(')') => break,
                 _ => return Err("Unexpected token in parameter list"),
             }
@@ -218,13 +228,6 @@ impl<'a, Writer: Write> CompilationEngine<'a, Writer> {
 
         self.compile_statements()?;
 
-        if is_void {
-            writeln!(self.out, "push constant 0").unwrap();
-        } else if proc_cat == "constructor" {
-            writeln!(self.out, "push pointer 0").unwrap();
-        }
-        writeln!(self.out, "return").unwrap();
-
         self.tokens.next().unwrap().write_xml(self.out); // }
         writeln!(self.out, "// </subroutineBody>").unwrap();
 
@@ -251,20 +254,27 @@ impl<'a, Writer: Write> CompilationEngine<'a, Writer> {
 
     fn compile_return(self: &mut Self) -> Res {
         writeln!(self.out, "// <returnStatement>").unwrap();
-        self.tokens.next().unwrap().write_xml(self.out);
-        if !matches!(self.tokens.peek().unwrap(), Symbol(';')) {
+
+        assert_eq!(self.tokens.unwrap_keyword(), "return");
+        if matches!(self.tokens.peek().unwrap(), Symbol(';')) {
+            // Return dummy value in `void` case
+            writeln! {self.out, "push constant 0"}.unwrap();
+        } else {
             self.compile_expression()?;
         }
-        self.tokens.next().unwrap().write_xml(self.out);
+        assert_eq!(self.tokens.unwrap_symbol(), ';');
+        writeln!(self.out, "return").unwrap();
+
         writeln!(self.out, "// </returnStatement>").unwrap();
         Ok(())
     }
 
     fn compile_do(self: &mut Self) -> Res {
         writeln!(self.out, "// <doStatement>").unwrap();
-        self.tokens.next().unwrap().write_xml(self.out); // do
+
+        assert_eq!(self.tokens.unwrap_keyword(), "do");
         self.compile_term_inner()?;
-        self.tokens.next().unwrap().write_xml(self.out); // ;
+        assert_eq!(self.tokens.unwrap_symbol(), ';');
         writeln!(self.out, "pop temp 0").unwrap(); // Yank computed value
 
         writeln!(self.out, "// </doStatement>").unwrap();
@@ -273,48 +283,70 @@ impl<'a, Writer: Write> CompilationEngine<'a, Writer> {
 
     fn compile_while(self: &mut Self) -> Res {
         writeln!(self.out, "// <whileStatement>").unwrap();
-        self.tokens.next().unwrap().write_xml(self.out);
-        self.tokens.next().unwrap().write_xml(self.out);
+
+        let label_start = self.create_label();
+        let label_end = self.create_label();
+        assert_eq!(self.tokens.unwrap_keyword(), "while");
+        writeln!(self.out, "label {label_start}").unwrap();
+        assert_eq!(self.tokens.unwrap_symbol(), '(');
         self.compile_expression()?;
-        self.tokens.next().unwrap().write_xml(self.out);
-        self.tokens.next().unwrap().write_xml(self.out);
+        assert_eq!(self.tokens.unwrap_symbol(), ')');
+        writeln!(self.out, "not").unwrap();
+        writeln!(self.out, "if-goto {label_end}").unwrap();
+        assert_eq!(self.tokens.unwrap_symbol(), '{');
         self.compile_statements()?;
-        self.tokens.next().unwrap().write_xml(self.out);
+        assert_eq!(self.tokens.unwrap_symbol(), '}');
+        writeln!(self.out, "goto {label_start}").unwrap();
+        writeln!(self.out, "label {label_end}").unwrap();
+
         writeln!(self.out, "// </whileStatement>").unwrap();
         Ok(())
     }
 
     fn compile_if(self: &mut Self) -> Res {
         writeln!(self.out, "// <ifStatement>").unwrap();
-        self.tokens.next().unwrap().write_xml(self.out);
-        self.tokens.next().unwrap().write_xml(self.out);
+
+        let label_else = self.create_label();
+        let label_end = self.create_label();
+
+        assert_eq!(self.tokens.unwrap_keyword(), "if");
+        assert_eq!(self.tokens.unwrap_symbol(), '(');
         self.compile_expression()?;
-        self.tokens.next().unwrap().write_xml(self.out);
-        self.tokens.next().unwrap().write_xml(self.out);
+        assert_eq!(self.tokens.unwrap_symbol(), ')');
+        writeln!(self.out, "not").unwrap();
+        writeln!(self.out, "if-goto {label_else}").unwrap();
+
+        assert_eq!(self.tokens.unwrap_symbol(), '{');
         self.compile_statements()?;
-        self.tokens.next().unwrap().write_xml(self.out);
+        assert_eq!(self.tokens.unwrap_symbol(), '}');
+        writeln!(self.out, "goto {label_end}").unwrap();
+
+        writeln!(self.out, "label {label_else}",).unwrap();
         if matches!(self.tokens.peek().unwrap(), Keyword("else")) {
-            self.tokens.next().unwrap().write_xml(self.out); // else
-            self.tokens.next().unwrap().write_xml(self.out); // {
+            assert_eq!(self.tokens.unwrap_keyword(), "else");
+            assert_eq!(self.tokens.unwrap_symbol(), '{');
             self.compile_statements()?;
-            self.tokens.next().unwrap().write_xml(self.out); // }
+            assert_eq!(self.tokens.unwrap_symbol(), '}');
         }
+        writeln!(self.out, "label {label_end}").unwrap();
+
         writeln!(self.out, "// </ifStatement>").unwrap();
         Ok(())
     }
 
     fn compile_let(self: &mut Self) -> Res {
         writeln!(self.out, "// <letStatement>").unwrap();
-        self.tokens.next().unwrap().write_xml(self.out);
-        self.tokens.next().unwrap().write_xml(self.out);
+        assert_eq!(self.tokens.unwrap_keyword(), "let");
+        let dest_ident = self.tokens.unwrap_identifier();
         if matches!(self.tokens.peek().unwrap(), Symbol('[')) {
             self.tokens.next().unwrap().write_xml(self.out); // [
             self.compile_expression()?;
             self.tokens.next().unwrap().write_xml(self.out); // ]
         }
-        self.tokens.next().unwrap().write_xml(self.out);
+        assert_eq!(self.tokens.unwrap_symbol(), '=');
         self.compile_expression()?;
-        self.tokens.next().unwrap().write_xml(self.out);
+        assert_eq!(self.tokens.unwrap_symbol(), ';');
+        self.pop(dest_ident);
         writeln!(self.out, "// </letStatement>").unwrap();
         Ok(())
     }
@@ -328,7 +360,6 @@ impl<'a, Writer: Write> CompilationEngine<'a, Writer> {
 
     fn compile_term_inner(self: &mut Self) -> Res {
         let t1 = self.tokens.next().unwrap();
-        t1.write_xml(self.out);
         Ok(match (&t1, self.tokens.peek().unwrap()) {
             (Keyword("true"), _) => writeln!(self.out, "push constant 1\nneg").unwrap(),
             (Keyword("false") | Keyword("null"), _) => {
@@ -338,40 +369,40 @@ impl<'a, Writer: Write> CompilationEngine<'a, Writer> {
             (IntegerConstant(i), _) => writeln!(self.out, "push constant {i}").unwrap(),
             (StringConstant(_), _) => todo!(),
             (Identifier(_), Symbol('[')) => {
-                self.tokens.next().unwrap().write_xml(self.out); // [
+                assert_eq!(self.tokens.unwrap_symbol(), '[');
                 self.compile_expression()?;
-                self.tokens.next().unwrap().write_xml(self.out); // ]
+                assert_eq!(self.tokens.unwrap_symbol(), ']');
+                todo!();
             }
             (Symbol('('), _) => {
                 self.compile_expression()?;
-                self.tokens.next().unwrap().write_xml(self.out); // )
+                assert_eq!(self.tokens.unwrap_symbol(), ')');
             }
-            (Symbol('-') | Symbol('~'), _) => {
+            (Symbol('-'), _) => {
                 self.compile_term()?;
+                writeln!(self.out, "neg").unwrap()
             }
-            (Identifier(_), Symbol('(')) => {
-                self.tokens.next().unwrap().write_xml(self.out); // (
-                self.compile_expression_list()?;
-                self.tokens.next().unwrap().write_xml(self.out); // )
+            (Symbol('~'), _) => {
+                self.compile_term()?;
+                writeln!(self.out, "not").unwrap()
             }
-            (Identifier(_), Symbol('.')) => {
-                self.tokens.next().unwrap().write_xml(self.out); // .
-                let class_name = t1.unwrap_identifier();
-                let method_name = self.tokens.unwrap_identifier();
-                self.tokens.next().unwrap().write_xml(self.out); // (
+            (Identifier(function_name), Symbol('(')) => {
+                assert_eq!(self.tokens.unwrap_symbol(), '(');
                 let n_args = self.compile_expression_list()?;
-                self.tokens.next().unwrap().write_xml(self.out); // )
+                assert_eq!(self.tokens.unwrap_symbol(), ')');
+                let class_name = self.class_name;
+                writeln!(self.out, "call {class_name}.{function_name} {n_args}").unwrap()
+            }
+            (Identifier(class_name), Symbol('.')) => {
+                assert_eq!(self.tokens.unwrap_symbol(), '.');
+                let method_name = self.tokens.unwrap_identifier();
+                assert_eq!(self.tokens.unwrap_symbol(), '(');
+                let n_args = self.compile_expression_list()?;
+                assert_eq!(self.tokens.unwrap_symbol(), ')');
                 writeln!(self.out, "call {class_name}.{method_name} {n_args}").unwrap();
             }
             (Identifier(ident_name), _) => {
-                let (_cat, _typ, _idx) = self.sym.retrieve(ident_name);
-                // match typ {
-                //     Keyword(_) => (),
-                //     Identifier(class_name) => {
-                //         writeln!(self.out, "")
-
-                //     }
-                // }
+                self.push(ident_name);
             }
             _ => return Err("Unexpected token in term"),
         })
@@ -383,7 +414,7 @@ impl<'a, Writer: Write> CompilationEngine<'a, Writer> {
         loop {
             match self.tokens.peek().unwrap() {
                 Symbol(',') => {
-                    self.tokens.next().unwrap().write_xml(self.out); // ,
+                    assert_eq!(self.tokens.unwrap_symbol(), ',');
                 }
                 Symbol(')') => break,
                 _ => {
@@ -467,5 +498,27 @@ impl<'a, Writer: Write> CompilationEngine<'a, Writer> {
         }
         writeln!(self.out, "// </varDec>").unwrap();
         Ok(())
+    }
+
+    pub fn push(&mut self, ident_name: &str) {
+        let (cat, _typ, idx) = self.sym.retrieve(ident_name);
+        writeln!(self.out, "push {cat} {idx}").unwrap();
+    }
+
+    pub fn pop(&mut self, ident_name: &str) {
+        let (cat, _typ, idx) = self.sym.retrieve(ident_name);
+        writeln!(self.out, "pop {cat} {idx}").unwrap();
+    }
+
+    pub fn create_label(&mut self) -> String {
+        let class_name = self.class_name;
+        let uid = self.uid();
+        let label_name = format!("{class_name}.__label{uid}");
+        label_name
+    }
+
+    pub fn uid(&mut self) -> usize {
+        self._uid += 1;
+        return self._uid;
     }
 }
