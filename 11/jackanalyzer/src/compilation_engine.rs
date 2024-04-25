@@ -447,17 +447,16 @@ impl<'a, Writer: Write> CompilationEngine<'a, Writer> {
     }
     fn compile_variable_declaration(self: &mut Self) -> Res {
         writeln!(self.out, "// <varDec>").unwrap();
+        assert!(matches!(self.tokens.next().unwrap(), Keyword("var")));
+        let typ = self.tokens.next().unwrap();
+        let name = self.tokens.unwrap_identifier();
+        self.sym.insert(name, IdentCat::Var, typ.clone());
         loop {
             match self.tokens.peek().unwrap() {
-                Keyword("var") => {
-                    assert!(matches!(self.tokens.next().unwrap(), Keyword("var")));
-                    let typ = self.tokens.next().unwrap();
-                    let name = self.tokens.unwrap_identifier();
-                    self.sym.insert(name, IdentCat::Var, typ);
-                }
                 Symbol(',') => {
                     self.tokens.next().unwrap().write_xml(self.out); // ,
-                    self.tokens.next().unwrap().write_xml(self.out); // identifier
+                    let name = self.tokens.unwrap_identifier();
+                    self.sym.insert(name, IdentCat::Var, typ.clone());
                 }
                 Symbol(';') => {
                     self.tokens.next().unwrap().write_xml(self.out); // ;

@@ -28,6 +28,11 @@ mod test {
         check_compile("../Seven");
     }
 
+    #[test]
+    fn convert_to_bin() {
+        check_compile("../ConvertToBin");
+    }
+
     fn check_compile(s: &str) {
         let path = Path::new(s);
         let cargo_root = Path::new(env!("CARGO_MANIFEST_DIR"));
