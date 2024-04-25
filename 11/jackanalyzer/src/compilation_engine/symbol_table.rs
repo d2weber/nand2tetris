@@ -1,8 +1,10 @@
 use std::collections::HashMap;
 
+use crate::token::Token;
+
 type Name = str;
 type Index = usize;
-type IdentType = str;
+type IdentType<'a> = Token<'a>; // type or ClassName
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub enum IdentCat {
@@ -14,7 +16,7 @@ pub enum IdentCat {
 
 #[derive(Debug)]
 pub struct SymbolTable<'a> {
-    inner: HashMap<(IdentCat, &'a Name), (&'a IdentType, Index)>,
+    inner: HashMap<(IdentCat, &'a Name), (IdentType<'a>, Index)>,
     n_fields: usize,
     n_statics: usize,
     n_vars: usize,
@@ -32,7 +34,7 @@ impl<'a> SymbolTable<'a> {
         }
     }
 
-    pub fn insert(&mut self, name: &'a str, cat: IdentCat, typ: &'a IdentType) {
+    pub fn insert(&mut self, name: &'a str, cat: IdentCat, typ: IdentType<'a>) {
         let idx = match cat {
             IdentCat::Field => {
                 let tmp = self.n_fields;
@@ -66,6 +68,21 @@ impl<'a> SymbolTable<'a> {
         });
         self.n_args = 0;
         self.n_vars = 0;
+    }
+
+    pub fn retrieve(&self, ident_name: &str) -> (IdentCat, IdentType<'a>, Index) {
+        self.inner
+            .iter()
+            .find(|((cat, name), _)| {
+                *name == ident_name && matches!(cat, IdentCat::Field | IdentCat::Static)
+            })
+            .or_else(|| {
+                self.inner
+                    .iter()
+                    .find(|((_cat, name), _)| *name == ident_name)
+            })
+            .map(|((cat, _name), (typ, idx))| (*cat, typ.clone(), *idx))
+            .unwrap()
     }
 
     pub fn n_fields(&self) -> usize {

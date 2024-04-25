@@ -146,15 +146,15 @@ impl<'a, Writer: Write> CompilationEngine<'a, Writer> {
             _ => return Err("Expected field or static"),
         };
 
-        let typ = self.tokens.unwrap_keyword_or_identifier();
-        let name = self.tokens.unwrap_ident();
-        self.sym.insert(name, cat, typ);
+        let typ = self.tokens.next().unwrap();
+        let name = self.tokens.unwrap_identifier();
+        self.sym.insert(name, cat, typ.clone());
         loop {
             match self.tokens.peek().unwrap() {
                 Symbol(',') => {
                     self.tokens.next().unwrap().write_xml(self.out); // ,
-                    let name = self.tokens.unwrap_ident();
-                    self.sym.insert(name, cat, typ);
+                    let name = self.tokens.unwrap_identifier();
+                    self.sym.insert(name, cat, typ.clone());
                 }
                 Symbol(';') => break,
                 _ => return Err("Unexpected token multi class variable declaration"),
@@ -171,14 +171,14 @@ impl<'a, Writer: Write> CompilationEngine<'a, Writer> {
         let proc_cat = self.tokens.unwrap_keyword();
         assert!(matches!(proc_cat, "constructor" | "method" | "function"));
         let is_void = self.tokens.unwrap_keyword_or_identifier() == "void";
-        let proc_name = self.tokens.unwrap_ident();
+        let proc_name = self.tokens.unwrap_identifier();
         self.tokens.next().unwrap().write_xml(self.out); // (
         writeln!(self.out, "// <parameterList>").unwrap();
         loop {
             match self.tokens.peek().unwrap() {
                 Keyword("int") | Keyword("char") | Identifier(_) => {
-                    let typ = self.tokens.unwrap_keyword_or_identifier();
-                    let name = self.tokens.unwrap_ident();
+                    let typ = self.tokens.next().unwrap();
+                    let name = self.tokens.unwrap_identifier();
                     self.sym.insert(name, IdentCat::Arg, typ);
                 }
                 Symbol(',') => self.tokens.next().unwrap().write_xml(self.out),
@@ -262,9 +262,11 @@ impl<'a, Writer: Write> CompilationEngine<'a, Writer> {
 
     fn compile_do(self: &mut Self) -> Res {
         writeln!(self.out, "// <doStatement>").unwrap();
-        self.tokens.next().unwrap().write_xml(self.out);
+        self.tokens.next().unwrap().write_xml(self.out); // do
         self.compile_term_inner()?;
-        self.tokens.next().unwrap().write_xml(self.out);
+        self.tokens.next().unwrap().write_xml(self.out); // ;
+        writeln!(self.out, "pop temp 0").unwrap(); // Yank computed value
+
         writeln!(self.out, "// </doStatement>").unwrap();
         Ok(())
     }
@@ -328,11 +330,13 @@ impl<'a, Writer: Write> CompilationEngine<'a, Writer> {
         let t1 = self.tokens.next().unwrap();
         t1.write_xml(self.out);
         Ok(match (&t1, self.tokens.peek().unwrap()) {
-            (
-                IntegerConstant(_) | StringConstant(_) | Keyword("true") | Keyword("false")
-                | Keyword("null") | Keyword("this"),
-                _,
-            ) => (),
+            (Keyword("true"), _) => writeln!(self.out, "push constant 1\nneg").unwrap(),
+            (Keyword("false") | Keyword("null"), _) => {
+                writeln!(self.out, "push constant 0").unwrap()
+            }
+            (Keyword("this"), _) => writeln!(self.out, "push pointer 0").unwrap(),
+            (IntegerConstant(i), _) => writeln!(self.out, "push constant {i}").unwrap(),
+            (StringConstant(_), _) => todo!(),
             (Identifier(_), Symbol('[')) => {
                 self.tokens.next().unwrap().write_xml(self.out); // [
                 self.compile_expression()?;
@@ -352,12 +356,23 @@ impl<'a, Writer: Write> CompilationEngine<'a, Writer> {
             }
             (Identifier(_), Symbol('.')) => {
                 self.tokens.next().unwrap().write_xml(self.out); // .
-                self.tokens.next().unwrap().write_xml(self.out); // identifier
+                let class_name = t1.unwrap_identifier();
+                let method_name = self.tokens.unwrap_identifier();
                 self.tokens.next().unwrap().write_xml(self.out); // (
-                self.compile_expression_list()?;
+                let n_args = self.compile_expression_list()?;
                 self.tokens.next().unwrap().write_xml(self.out); // )
+                writeln!(self.out, "call {class_name}.{method_name} {n_args}").unwrap();
             }
-            (Identifier(_), _) => (),
+            (Identifier(ident_name), _) => {
+                let (_cat, _typ, _idx) = self.sym.retrieve(ident_name);
+                // match typ {
+                //     Keyword(_) => (),
+                //     Identifier(class_name) => {
+                //         writeln!(self.out, "")
+
+                //     }
+                // }
+            }
             _ => return Err("Unexpected token in term"),
         })
     }
@@ -384,20 +399,48 @@ impl<'a, Writer: Write> CompilationEngine<'a, Writer> {
     fn compile_expression(self: &mut Self) -> Res {
         writeln!(self.out, "// <expression>").unwrap();
         self.compile_term()?;
-        while matches!(
-            self.tokens.peek().unwrap(),
-            Symbol('+')
-                | Symbol('-')
-                | Symbol('*')
-                | Symbol('/')
-                | Symbol('&')
-                | Symbol('|')
-                | Symbol('<')
-                | Symbol('>')
-                | Symbol('=')
-        ) {
-            self.tokens.next().unwrap().write_xml(self.out);
+        loop {
+            let op = match self.tokens.peek().unwrap() {
+                Symbol('+') => {
+                    self.tokens.next().unwrap();
+                    "add"
+                }
+                Symbol('-') => {
+                    self.tokens.next().unwrap();
+                    "sub"
+                }
+                Symbol('*') => {
+                    self.tokens.next().unwrap();
+                    "call Math.multiply 2"
+                }
+                Symbol('/') => {
+                    self.tokens.next().unwrap();
+                    "call Math.divide 2"
+                }
+                Symbol('&') => {
+                    self.tokens.next().unwrap();
+                    "and"
+                }
+                Symbol('|') => {
+                    self.tokens.next().unwrap();
+                    "or"
+                }
+                Symbol('<') => {
+                    self.tokens.next().unwrap();
+                    "lt"
+                }
+                Symbol('>') => {
+                    self.tokens.next().unwrap();
+                    "gt"
+                }
+                Symbol('=') => {
+                    self.tokens.next().unwrap();
+                    "eq"
+                }
+                _ => break,
+            };
             self.compile_term()?;
+            writeln!(self.out, "{op}").unwrap();
         }
         writeln!(self.out, "// </expression>").unwrap();
         Ok(())
@@ -408,8 +451,8 @@ impl<'a, Writer: Write> CompilationEngine<'a, Writer> {
             match self.tokens.peek().unwrap() {
                 Keyword("var") => {
                     assert!(matches!(self.tokens.next().unwrap(), Keyword("var")));
-                    let typ = self.tokens.unwrap_keyword_or_identifier();
-                    let name = self.tokens.unwrap_ident();
+                    let typ = self.tokens.next().unwrap();
+                    let name = self.tokens.unwrap_identifier();
                     self.sym.insert(name, IdentCat::Var, typ);
                 }
                 Symbol(',') => {

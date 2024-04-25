@@ -1,6 +1,6 @@
 use std::iter::Peekable;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Token<'a> {
     Keyword(&'a str),
     Symbol(char),
@@ -27,6 +27,19 @@ impl<'a> Token<'a> {
             Token::StringConstant(s) => {
                 writeln!(out, "// <stringConstant> {s} </stringConstant>").unwrap()
             }
+        }
+    }
+
+    pub(crate) fn unwrap_identifier(&self) -> &'a str {
+        match self {
+            Token::Identifier(ident) => ident,
+            v => panic!("Expected identifier, got {v:?}"),
+        }
+    }
+    pub(crate) fn unwrap_keyword(&self) -> &'a str {
+        match self {
+            Token::Keyword(kw) => kw,
+            v => panic!("Expected keyword, got {v:?}"),
         }
     }
 }
@@ -120,10 +133,7 @@ impl<'a> TokenStream<'a> {
     }
 
     pub(crate) fn unwrap_keyword(&mut self) -> &'a str {
-        match self.next().unwrap() {
-            Token::Keyword(kw) => kw,
-            v => panic!("Expected keyword, got {v:?}"),
-        }
+        self.next().unwrap().unwrap_keyword()
     }
 
     pub(crate) fn unwrap_keyword_or_identifier(&mut self) -> &'a str {
@@ -134,11 +144,8 @@ impl<'a> TokenStream<'a> {
         }
     }
 
-    pub(crate) fn unwrap_ident(&mut self) -> &'a str {
-        match self.next().unwrap() {
-            Token::Identifier(ident) => ident,
-            v => panic!("Expected identifier, got {v:?}"),
-        }
+    pub(crate) fn unwrap_identifier(&mut self) -> &'a str {
+        self.next().unwrap().unwrap_identifier()
     }
 }
 
