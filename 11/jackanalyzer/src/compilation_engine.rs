@@ -14,7 +14,7 @@ use crate::{
 use self::symbol_table::SymbolTable;
 type Res = Result<(), &'static str>;
 
-pub(crate) fn compile_path(path: &Path) -> std::io::Result<()> {
+pub fn compile_path(path: &Path) -> std::io::Result<()> {
     if path.is_file() {
         let mut out = BufWriter::new(File::create(path.with_extension("vm"))?);
         compile_file(path, &mut out);
@@ -38,7 +38,7 @@ pub(crate) fn compile_path(path: &Path) -> std::io::Result<()> {
     }
 }
 
-fn compile_file(jack_file: &Path, out: &mut impl Write) {
+pub fn compile_file(jack_file: &Path, out: &mut impl Write) {
     let s = fs::read_to_string(jack_file)
         .unwrap_or_else(|_| panic!("Couldn't read {}.", jack_file.display()));
 

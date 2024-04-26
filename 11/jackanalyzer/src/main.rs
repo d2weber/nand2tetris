@@ -19,32 +19,36 @@ fn main() {
 
 #[cfg(test)]
 mod test {
-    use std::{fs, path::Path};
+    use std::{fs, io::BufWriter, path::Path};
 
     use super::*;
 
     #[test]
     fn seven() {
-        check_compile("../Seven");
+        snapshot_directory("../Seven");
     }
 
     #[test]
     fn convert_to_bin() {
-        check_compile("../ConvertToBin");
+        snapshot_directory("../ConvertToBin");
     }
 
-    fn check_compile(s: &str) {
+    fn snapshot_directory(s: &str) {
         let path = Path::new(s);
         let cargo_root = Path::new(env!("CARGO_MANIFEST_DIR"));
         let path = cargo_root.join(path);
 
-        // Cleanup old vm files
-        for file in files_with_extension(&path, "vm") {
-            fs::remove_file(file).unwrap();
+        for file in files_with_extension(&path, "jack") {
+            let snapshot_name = file.strip_prefix(cargo_root).unwrap().display().to_string();
+            snapshot_compiled(&snapshot_name, &file);
         }
+    }
 
-        // Write vm files
-        compilation_engine::compile_path(&path).unwrap();
+    fn snapshot_compiled(snapshot_name: &str, file_name: &Path) {
+        let mut out = BufWriter::new(Vec::new());
+        compilation_engine::compile_file(file_name, &mut out);
+        let vm_code = String::from_utf8(out.into_inner().unwrap()).unwrap();
+        insta::assert_snapshot!(snapshot_name, vm_code);
     }
 
     fn files_with_extension<'a>(
