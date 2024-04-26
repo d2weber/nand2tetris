@@ -313,10 +313,10 @@ impl<'a, Writer: Write> CompilationEngine<'a, Writer> {
         assert_eq!(self.tokens.unwrap_keyword(), "let");
         let dest_ident = self.tokens.unwrap_identifier();
         if matches!(self.tokens.peek().unwrap(), Symbol('[')) {
-            // TODO
             assert_eq!(self.tokens.unwrap_symbol(), '[');
             self.compile_expression()?;
             assert_eq!(self.tokens.unwrap_symbol(), ']');
+            todo!()
         }
         assert_eq!(self.tokens.unwrap_symbol(), '=');
         self.compile_expression()?;
@@ -360,18 +360,28 @@ impl<'a, Writer: Write> CompilationEngine<'a, Writer> {
             }
             (Identifier(function_name), Symbol('(')) => {
                 assert_eq!(self.tokens.unwrap_symbol(), '(');
-                let n_args = self.compile_expression_list()?;
+                let n_args = self.compile_expression_list()? + 1 /*first arg is this*/;
                 assert_eq!(self.tokens.unwrap_symbol(), ')');
                 let class_name = self.class_name;
+                writeln!(self.out, "push pointer 0").unwrap();
                 writeln!(self.out, "call {class_name}.{function_name} {n_args}").unwrap()
             }
-            (Identifier(class_name), Symbol('.')) => {
+            (Identifier(class_or_object), Symbol('.')) => {
+                let (mut n_args, scope) =
+                    if let Some((cat, typ, idx)) = self.sym.retrieve(class_or_object) {
+                        // is an object
+                        writeln!(self.out, "push {cat} {idx}").unwrap();
+                        (1, typ.unwrap_identifier())
+                    } else {
+                        let class_name = *class_or_object;
+                        (0, class_name)
+                    };
                 assert_eq!(self.tokens.unwrap_symbol(), '.');
                 let method_name = self.tokens.unwrap_identifier();
                 assert_eq!(self.tokens.unwrap_symbol(), '(');
-                let n_args = self.compile_expression_list()?;
+                n_args += self.compile_expression_list()?;
                 assert_eq!(self.tokens.unwrap_symbol(), ')');
-                writeln!(self.out, "call {class_name}.{method_name} {n_args}").unwrap();
+                writeln!(self.out, "call {scope}.{method_name} {n_args}").unwrap();
             }
             (Identifier(ident_name), _) => {
                 self.push(ident_name);
@@ -467,12 +477,12 @@ impl<'a, Writer: Write> CompilationEngine<'a, Writer> {
     }
 
     pub fn push(&mut self, ident_name: &str) {
-        let (cat, _typ, idx) = self.sym.retrieve(ident_name);
+        let (cat, _typ, idx) = self.sym.retrieve(ident_name).unwrap();
         writeln!(self.out, "push {cat} {idx}").unwrap();
     }
 
     pub fn pop(&mut self, ident_name: &str) {
-        let (cat, _typ, idx) = self.sym.retrieve(ident_name);
+        let (cat, _typ, idx) = self.sym.retrieve(ident_name).unwrap();
         writeln!(self.out, "pop {cat} {idx}").unwrap();
     }
 

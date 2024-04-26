@@ -33,6 +33,11 @@ mod test {
         snapshot_directory("../ConvertToBin");
     }
 
+    #[test]
+    fn square() {
+        snapshot_directory("../Square");
+    }
+
     fn snapshot_directory(s: &str) {
         let path = Path::new(s);
         let cargo_root = Path::new(env!("CARGO_MANIFEST_DIR"));

@@ -71,7 +71,7 @@ impl<'a> SymbolTable<'a> {
         self.n_vars = 0;
     }
 
-    pub fn retrieve(&self, ident_name: &str) -> (&'static Category, IdentType<'a>, Index) {
+    pub fn retrieve(&self, ident_name: &str) -> Option<(&'static Category, IdentType<'a>, Index)> {
         self.inner
             .iter()
             .find(|((cat, name), _)| {
@@ -94,7 +94,6 @@ impl<'a> SymbolTable<'a> {
                     *idx,
                 )
             })
-            .unwrap()
     }
 
     pub fn n_fields(&self) -> usize {
