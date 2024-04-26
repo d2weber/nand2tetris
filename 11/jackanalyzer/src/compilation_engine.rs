@@ -312,16 +312,26 @@ impl<'a, Writer: Write> CompilationEngine<'a, Writer> {
     fn compile_let(self: &mut Self) -> Res {
         assert_eq!(self.tokens.unwrap_keyword(), "let");
         let dest_ident = self.tokens.unwrap_identifier();
-        if matches!(self.tokens.peek().unwrap(), Symbol('[')) {
+        let is_arr = matches!(self.tokens.peek().unwrap(), Symbol('['));
+        if is_arr {
+            // Put destination address on stack
             assert_eq!(self.tokens.unwrap_symbol(), '[');
             self.compile_expression()?;
             assert_eq!(self.tokens.unwrap_symbol(), ']');
-            todo!()
+            self.push(dest_ident);
+            writeln!(self.out, "add").unwrap();
         }
         assert_eq!(self.tokens.unwrap_symbol(), '=');
         self.compile_expression()?;
         assert_eq!(self.tokens.unwrap_symbol(), ';');
-        self.pop(dest_ident);
+        if is_arr {
+            writeln!(self.out, "pop temp 0").unwrap();
+            writeln!(self.out, "pop pointer 1").unwrap();
+            writeln!(self.out, "push temp 0").unwrap();
+            writeln!(self.out, "pop that 0").unwrap();
+        } else {
+            self.pop(dest_ident);
+        }
         Ok(())
     }
 
@@ -339,12 +349,23 @@ impl<'a, Writer: Write> CompilationEngine<'a, Writer> {
             }
             (Keyword("this"), _) => writeln!(self.out, "push pointer 0").unwrap(),
             (IntegerConstant(i), _) => writeln!(self.out, "push constant {i}").unwrap(),
-            (StringConstant(_), _) => todo!(),
-            (Identifier(_), Symbol('[')) => {
+            (StringConstant(s), _) => {
+                assert!(s.is_ascii());
+                writeln!(self.out, "push constant {len}", len = s.len()).unwrap();
+                writeln!(self.out, "call String.new 1").unwrap();
+                for c in s.escape_default() {
+                    writeln!(self.out, "push constant {}", c as u8).unwrap();
+                    writeln!(self.out, "call String.appendChar 2").unwrap();
+                }
+            }
+            (Identifier(arr_name), Symbol('[')) => {
                 assert_eq!(self.tokens.unwrap_symbol(), '[');
                 self.compile_expression()?;
                 assert_eq!(self.tokens.unwrap_symbol(), ']');
-                todo!();
+                self.push(arr_name);
+                writeln!(self.out, "add").unwrap();
+                writeln!(self.out, "pop pointer 1").unwrap();
+                writeln!(self.out, "push that 0").unwrap();
             }
             (Symbol('('), _) => {
                 self.compile_expression()?;
