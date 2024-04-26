@@ -103,10 +103,9 @@ impl<'a, Writer: Write> CompilationEngine<'a, Writer> {
     }
 
     fn compile_class(&mut self) -> Res {
-        writeln!(self.out, "// <class>").unwrap();
-        self.tokens.next().unwrap().write_xml(self.out); // class
-        self.tokens.next().unwrap().write_xml(self.out); // Identifier
-        self.tokens.next().unwrap().write_xml(self.out); // {
+        assert_eq!(self.tokens.unwrap_keyword(), "class");
+        assert_eq!(self.tokens.unwrap_identifier(), self.class_name);
+        assert_eq!(self.tokens.unwrap_symbol(), '{');
 
         loop {
             match self.tokens.peek().unwrap() {
@@ -131,8 +130,7 @@ impl<'a, Writer: Write> CompilationEngine<'a, Writer> {
             self.sym.reset_vars_and_args();
         }
 
-        self.tokens.next().unwrap().write_xml(self.out); // }
-        writeln!(self.out, "// </class>").unwrap();
+        assert_eq!(self.tokens.unwrap_symbol(), '}');
         assert!(
             self.tokens.next().is_none(),
             "Should be consumed after class."
@@ -141,7 +139,6 @@ impl<'a, Writer: Write> CompilationEngine<'a, Writer> {
     }
 
     fn compile_class_variable_declaration(self: &mut Self) -> Res {
-        writeln!(self.out, "// <classVarDec>").unwrap();
         let cat = match self.tokens.unwrap_keyword() {
             "field" => IdentCat::Field,
             "static" => IdentCat::Static,
@@ -154,7 +151,7 @@ impl<'a, Writer: Write> CompilationEngine<'a, Writer> {
         loop {
             match self.tokens.peek().unwrap() {
                 Symbol(',') => {
-                    self.tokens.next().unwrap().write_xml(self.out); // ,
+                    assert_eq!(self.tokens.unwrap_symbol(), ',');
                     let name = self.tokens.unwrap_identifier();
                     self.sym.insert(name, cat, typ.clone());
                 }
@@ -162,15 +159,12 @@ impl<'a, Writer: Write> CompilationEngine<'a, Writer> {
                 _ => return Err("Unexpected token multi class variable declaration"),
             }
         }
-        self.tokens.next().unwrap().write_xml(self.out); // ;
+        assert_eq!(self.tokens.unwrap_symbol(), ';');
 
-        writeln!(self.out, "// </classVarDec>").unwrap();
         Ok(())
     }
 
     fn compile_subroutine(self: &mut Self) -> Res {
-        writeln!(self.out, "// <subroutineDec>").unwrap();
-
         let proc_cat = self.tokens.unwrap_keyword();
         assert!(matches!(proc_cat, "constructor" | "method" | "function"));
         let return_type = self.tokens.next().unwrap();
@@ -181,7 +175,6 @@ impl<'a, Writer: Write> CompilationEngine<'a, Writer> {
         }
 
         assert_eq!(self.tokens.unwrap_symbol(), '(');
-        writeln!(self.out, "// <parameterList>").unwrap();
         loop {
             match self.tokens.peek().unwrap() {
                 Keyword("int") | Keyword("char") | Identifier(_) => {
@@ -196,11 +189,9 @@ impl<'a, Writer: Write> CompilationEngine<'a, Writer> {
                 _ => return Err("Unexpected token in parameter list"),
             }
         }
-        writeln!(self.out, "// </parameterList>").unwrap();
-        self.tokens.next().unwrap().write_xml(self.out); // )
+        assert_eq!(self.tokens.unwrap_symbol(), ')');
 
-        writeln!(self.out, "// <subroutineBody>").unwrap();
-        self.tokens.next().unwrap().write_xml(self.out); // {
+        assert_eq!(self.tokens.unwrap_symbol(), '{');
         while matches!(self.tokens.peek().unwrap(), Keyword("var")) {
             self.compile_variable_declaration()?;
         }
@@ -228,15 +219,12 @@ impl<'a, Writer: Write> CompilationEngine<'a, Writer> {
 
         self.compile_statements()?;
 
-        self.tokens.next().unwrap().write_xml(self.out); // }
-        writeln!(self.out, "// </subroutineBody>").unwrap();
+        assert_eq!(self.tokens.unwrap_symbol(), '}');
 
-        writeln!(self.out, "// </subroutineDec>").unwrap();
         Ok(())
     }
 
     fn compile_statements(self: &mut Self) -> Res {
-        writeln!(self.out, "// <statements>").unwrap();
         loop {
             match self.tokens.peek().unwrap() {
                 Keyword("let") => self.compile_let()?,
@@ -248,13 +236,10 @@ impl<'a, Writer: Write> CompilationEngine<'a, Writer> {
                 _ => return Err("Unexpected token in statements"),
             }
         }
-        writeln!(self.out, "// </statements>").unwrap();
         Ok(())
     }
 
     fn compile_return(self: &mut Self) -> Res {
-        writeln!(self.out, "// <returnStatement>").unwrap();
-
         assert_eq!(self.tokens.unwrap_keyword(), "return");
         if matches!(self.tokens.peek().unwrap(), Symbol(';')) {
             // Return dummy value in `void` case
@@ -265,25 +250,19 @@ impl<'a, Writer: Write> CompilationEngine<'a, Writer> {
         assert_eq!(self.tokens.unwrap_symbol(), ';');
         writeln!(self.out, "return").unwrap();
 
-        writeln!(self.out, "// </returnStatement>").unwrap();
         Ok(())
     }
 
     fn compile_do(self: &mut Self) -> Res {
-        writeln!(self.out, "// <doStatement>").unwrap();
-
         assert_eq!(self.tokens.unwrap_keyword(), "do");
         self.compile_term_inner()?;
         assert_eq!(self.tokens.unwrap_symbol(), ';');
         writeln!(self.out, "pop temp 0").unwrap(); // Yank computed value
 
-        writeln!(self.out, "// </doStatement>").unwrap();
         Ok(())
     }
 
     fn compile_while(self: &mut Self) -> Res {
-        writeln!(self.out, "// <whileStatement>").unwrap();
-
         let label_start = self.create_label();
         let label_end = self.create_label();
         assert_eq!(self.tokens.unwrap_keyword(), "while");
@@ -299,13 +278,10 @@ impl<'a, Writer: Write> CompilationEngine<'a, Writer> {
         writeln!(self.out, "goto {label_start}").unwrap();
         writeln!(self.out, "label {label_end}").unwrap();
 
-        writeln!(self.out, "// </whileStatement>").unwrap();
         Ok(())
     }
 
     fn compile_if(self: &mut Self) -> Res {
-        writeln!(self.out, "// <ifStatement>").unwrap();
-
         let label_else = self.create_label();
         let label_end = self.create_label();
 
@@ -330,31 +306,27 @@ impl<'a, Writer: Write> CompilationEngine<'a, Writer> {
         }
         writeln!(self.out, "label {label_end}").unwrap();
 
-        writeln!(self.out, "// </ifStatement>").unwrap();
         Ok(())
     }
 
     fn compile_let(self: &mut Self) -> Res {
-        writeln!(self.out, "// <letStatement>").unwrap();
         assert_eq!(self.tokens.unwrap_keyword(), "let");
         let dest_ident = self.tokens.unwrap_identifier();
         if matches!(self.tokens.peek().unwrap(), Symbol('[')) {
-            self.tokens.next().unwrap().write_xml(self.out); // [
+            // TODO
+            assert_eq!(self.tokens.unwrap_symbol(), '[');
             self.compile_expression()?;
-            self.tokens.next().unwrap().write_xml(self.out); // ]
+            assert_eq!(self.tokens.unwrap_symbol(), ']');
         }
         assert_eq!(self.tokens.unwrap_symbol(), '=');
         self.compile_expression()?;
         assert_eq!(self.tokens.unwrap_symbol(), ';');
         self.pop(dest_ident);
-        writeln!(self.out, "// </letStatement>").unwrap();
         Ok(())
     }
 
     fn compile_term(self: &mut Self) -> Res {
-        writeln!(self.out, "// <term>").unwrap();
         self.compile_term_inner()?;
-        writeln!(self.out, "// </term>").unwrap();
         Ok(())
     }
 
@@ -409,7 +381,6 @@ impl<'a, Writer: Write> CompilationEngine<'a, Writer> {
     }
 
     fn compile_expression_list(self: &mut Self) -> Result<usize, &'static str> {
-        writeln!(self.out, "// <expressionList>").unwrap();
         let mut n = 0;
         loop {
             match self.tokens.peek().unwrap() {
@@ -423,12 +394,10 @@ impl<'a, Writer: Write> CompilationEngine<'a, Writer> {
                 }
             }
         }
-        writeln!(self.out, "// </expressionList>").unwrap();
         Ok(n)
     }
 
     fn compile_expression(self: &mut Self) -> Res {
-        writeln!(self.out, "// <expression>").unwrap();
         self.compile_term()?;
         loop {
             let op = match self.tokens.peek().unwrap() {
@@ -473,11 +442,9 @@ impl<'a, Writer: Write> CompilationEngine<'a, Writer> {
             self.compile_term()?;
             writeln!(self.out, "{op}").unwrap();
         }
-        writeln!(self.out, "// </expression>").unwrap();
         Ok(())
     }
     fn compile_variable_declaration(self: &mut Self) -> Res {
-        writeln!(self.out, "// <varDec>").unwrap();
         assert!(matches!(self.tokens.next().unwrap(), Keyword("var")));
         let typ = self.tokens.next().unwrap();
         let name = self.tokens.unwrap_identifier();
@@ -485,18 +452,17 @@ impl<'a, Writer: Write> CompilationEngine<'a, Writer> {
         loop {
             match self.tokens.peek().unwrap() {
                 Symbol(',') => {
-                    self.tokens.next().unwrap().write_xml(self.out); // ,
+                    assert_eq!(self.tokens.unwrap_symbol(), ',');
                     let name = self.tokens.unwrap_identifier();
                     self.sym.insert(name, IdentCat::Var, typ.clone());
                 }
                 Symbol(';') => {
-                    self.tokens.next().unwrap().write_xml(self.out); // ;
+                    assert_eq!(self.tokens.unwrap_symbol(), ';');
                     break;
                 }
                 _ => return Err("Unexpected token in variable declaration"),
             }
         }
-        writeln!(self.out, "// </varDec>").unwrap();
         Ok(())
     }
 
