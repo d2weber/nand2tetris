@@ -380,11 +380,11 @@ impl<'a, Writer: Write> CompilationEngine<'a, Writer> {
                 writeln!(self.out, "not").unwrap()
             }
             (Identifier(function_name), Symbol('(')) => {
+                writeln!(self.out, "push pointer 0").unwrap();
                 assert_eq!(self.tokens.unwrap_symbol(), '(');
                 let n_args = self.compile_expression_list()? + 1 /*first arg is this*/;
                 assert_eq!(self.tokens.unwrap_symbol(), ')');
                 let class_name = self.class_name;
-                writeln!(self.out, "push pointer 0").unwrap();
                 writeln!(self.out, "call {class_name}.{function_name} {n_args}").unwrap()
             }
             (Identifier(class_or_object), Symbol('.')) => {

@@ -43,6 +43,11 @@ mod test {
         snapshot_directory("../Average");
     }
 
+    #[test]
+    fn pong() {
+        snapshot_directory("../Pong");
+    }
+
     fn snapshot_directory(s: &str) {
         let path = Path::new(s);
         let cargo_root = Path::new(env!("CARGO_MANIFEST_DIR"));
