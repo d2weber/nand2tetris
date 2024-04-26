@@ -263,8 +263,8 @@ impl<'a, Writer: Write> CompilationEngine<'a, Writer> {
     }
 
     fn compile_while(self: &mut Self) -> Res {
-        let label_start = self.create_label();
-        let label_end = self.create_label();
+        let label_start = self.create_label("WHILE_EXP");
+        let label_end = self.create_label("WHILE_END");
         assert_eq!(self.tokens.unwrap_keyword(), "while");
         writeln!(self.out, "label {label_start}").unwrap();
         assert_eq!(self.tokens.unwrap_symbol(), '(');
@@ -282,8 +282,8 @@ impl<'a, Writer: Write> CompilationEngine<'a, Writer> {
     }
 
     fn compile_if(self: &mut Self) -> Res {
-        let label_else = self.create_label();
-        let label_end = self.create_label();
+        let label_else = self.create_label("IF_FALSE");
+        let label_end = self.create_label("IF_TRUE");
 
         assert_eq!(self.tokens.unwrap_keyword(), "if");
         assert_eq!(self.tokens.unwrap_symbol(), '(');
@@ -476,15 +476,15 @@ impl<'a, Writer: Write> CompilationEngine<'a, Writer> {
         writeln!(self.out, "pop {cat} {idx}").unwrap();
     }
 
-    pub fn create_label(&mut self) -> String {
-        let class_name = self.class_name;
+    pub fn create_label(&mut self, prefix: &str) -> String {
         let uid = self.uid();
-        let label_name = format!("{class_name}.__label{uid}");
+        let label_name = format!("{prefix}{uid}");
         label_name
     }
 
     pub fn uid(&mut self) -> usize {
+        let out = self._uid;
         self._uid += 1;
-        return self._uid;
+        return out;
     }
 }
