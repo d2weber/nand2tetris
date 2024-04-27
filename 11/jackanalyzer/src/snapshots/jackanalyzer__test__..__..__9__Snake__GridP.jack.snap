@@ -1,0 +1,189 @@
+---
+source: src/main.rs
+expression: vm_code
+---
+function GridP.new 0
+push constant 2
+call Memory.alloc 1
+pop pointer 0
+push argument 0
+pop this 0
+push argument 1
+pop this 1
+push pointer 0
+call GridP.draw 1
+pop temp 0
+push pointer 0
+return
+function GridP.maybeNew 0
+push argument 0
+push constant 0
+lt
+push argument 0
+call GridP.max_x 0
+gt
+or
+push argument 1
+push constant 0
+lt
+or
+push argument 1
+call GridP.max_y 0
+gt
+or
+not
+if-goto IF_FALSE0
+push constant 0
+return
+goto IF_TRUE1
+label IF_FALSE0
+label IF_TRUE1
+push argument 0
+push argument 1
+call GridP.new 2
+return
+function GridP.x 0
+push argument 0
+pop pointer 0
+push this 0
+return
+function GridP.y 0
+push argument 0
+pop pointer 0
+push this 1
+return
+function GridP.eq 0
+push argument 0
+pop pointer 0
+push this 0
+push argument 1
+call GridP.x 1
+eq
+push this 1
+push argument 1
+call GridP.y 1
+eq
+and
+return
+function GridP.left 0
+push argument 0
+pop pointer 0
+push this 0
+push constant 1
+sub
+push this 1
+call GridP.maybeNew 2
+return
+function GridP.right 0
+push argument 0
+pop pointer 0
+push this 0
+push constant 1
+add
+push this 1
+call GridP.maybeNew 2
+return
+function GridP.above 0
+push argument 0
+pop pointer 0
+push this 0
+push this 1
+push constant 1
+sub
+call GridP.maybeNew 2
+return
+function GridP.below 0
+push argument 0
+pop pointer 0
+push this 0
+push this 1
+push constant 1
+add
+call GridP.maybeNew 2
+return
+function GridP.draw 0
+push argument 0
+pop pointer 0
+push constant 1
+neg
+call Screen.setColor 1
+pop temp 0
+push this 0
+push constant 16
+call Math.multiply 2
+push this 1
+push constant 16
+call Math.multiply 2
+push this 0
+push constant 1
+add
+push constant 16
+call Math.multiply 2
+push constant 1
+sub
+push this 1
+push constant 1
+add
+push constant 16
+call Math.multiply 2
+push constant 1
+sub
+call Screen.drawRectangle 4
+pop temp 0
+push constant 0
+return
+function GridP.undraw 0
+push argument 0
+pop pointer 0
+push constant 0
+call Screen.setColor 1
+pop temp 0
+push this 0
+push constant 16
+call Math.multiply 2
+push this 1
+push constant 16
+call Math.multiply 2
+push this 0
+push constant 1
+add
+push constant 16
+call Math.multiply 2
+push constant 1
+sub
+push this 1
+push constant 1
+add
+push constant 16
+call Math.multiply 2
+push constant 1
+sub
+call Screen.drawRectangle 4
+pop temp 0
+push constant 0
+return
+function GridP.disposeKeepDrawn 0
+push argument 0
+pop pointer 0
+push pointer 0
+call Memory.deAlloc 1
+pop temp 0
+push constant 0
+return
+function GridP.dispose 0
+push argument 0
+pop pointer 0
+push pointer 0
+call GridP.undraw 1
+pop temp 0
+push pointer 0
+call Memory.deAlloc 1
+pop temp 0
+push constant 0
+return
+function GridP.max_x 0
+push constant 31
+return
+function GridP.max_y 0
+push constant 15
+return

@@ -75,7 +75,7 @@ impl<'a> SymbolTable<'a> {
         self.inner
             .iter()
             .find(|((cat, name), _)| {
-                *name == ident_name && matches!(cat, IdentCat::Field | IdentCat::Static)
+                *name == ident_name && matches!(cat, IdentCat::Arg | IdentCat::Var)
             })
             .or_else(|| {
                 self.inner
