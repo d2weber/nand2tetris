@@ -48,6 +48,11 @@ mod test {
         snapshot_directory("../Pong");
     }
 
+    #[test]
+    fn complex_array() {
+        snapshot_directory("../ComplexArrays");
+    }
+
     fn snapshot_directory(s: &str) {
         let path = Path::new(s);
         let cargo_root = Path::new(env!("CARGO_MANIFEST_DIR"));
