@@ -88,9 +88,10 @@ fn keyword_token(s: &str) -> Option<(&str, &str)> {
         "while",
         "return",
     ] {
-        let result = strip_prefix_and_rest(s, keyword);
-        if result.is_some() {
-            return result;
+        if let Some((keyword, rest)) = strip_prefix_and_rest(s, keyword) {
+            if !rest.starts_with(|c: char| c.is_ascii_alphabetic()) {
+                return Some((keyword, rest));
+            }
         }
     }
     None
