@@ -255,7 +255,7 @@ impl<'a, Writer: Write> CompilationEngine<'a, Writer> {
 
     fn compile_do(&mut self) -> Res {
         assert_eq!(self.tokens.unwrap_keyword(), "do");
-        self.compile_term_inner()?;
+        self.compile_term()?;
         assert_eq!(self.tokens.unwrap_symbol(), ';');
         writeln!(self.out, "pop temp 0").unwrap(); // Yank computed value
 
@@ -336,11 +336,6 @@ impl<'a, Writer: Write> CompilationEngine<'a, Writer> {
     }
 
     fn compile_term(&mut self) -> Res {
-        self.compile_term_inner()?;
-        Ok(())
-    }
-
-    fn compile_term_inner(&mut self) -> Res {
         let t1 = self.tokens.next().unwrap();
         match (&t1, self.tokens.peek().unwrap()) {
             (Keyword("true"), _) => writeln!(self.out, "push constant 1\nneg").unwrap(),
