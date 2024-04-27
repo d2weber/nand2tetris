@@ -75,7 +75,7 @@ mod test {
         path: &'a Path,
         extension: &'a str,
     ) -> impl Iterator<Item = PathBuf> + 'a {
-        fs::read_dir(&path).unwrap().filter_map(move |dir_entry| {
+        fs::read_dir(path).unwrap().filter_map(move |dir_entry| {
             let file = dir_entry.unwrap().path();
             file.extension()
                 .is_some_and(|e| e == extension)

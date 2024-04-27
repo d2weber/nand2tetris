@@ -138,7 +138,7 @@ impl<'a, Writer: Write> CompilationEngine<'a, Writer> {
         Ok(())
     }
 
-    fn compile_class_variable_declaration(self: &mut Self) -> Res {
+    fn compile_class_variable_declaration(&mut self) -> Res {
         let cat = match self.tokens.unwrap_keyword() {
             "field" => IdentCat::Field,
             "static" => IdentCat::Static,
@@ -164,7 +164,7 @@ impl<'a, Writer: Write> CompilationEngine<'a, Writer> {
         Ok(())
     }
 
-    fn compile_subroutine(self: &mut Self) -> Res {
+    fn compile_subroutine(&mut self) -> Res {
         let proc_cat = self.tokens.unwrap_keyword();
         assert!(matches!(proc_cat, "constructor" | "method" | "function"));
         let return_type = self.tokens.next().unwrap();
@@ -224,7 +224,7 @@ impl<'a, Writer: Write> CompilationEngine<'a, Writer> {
         Ok(())
     }
 
-    fn compile_statements(self: &mut Self) -> Res {
+    fn compile_statements(&mut self) -> Res {
         loop {
             match self.tokens.peek().unwrap() {
                 Keyword("let") => self.compile_let()?,
@@ -239,7 +239,7 @@ impl<'a, Writer: Write> CompilationEngine<'a, Writer> {
         Ok(())
     }
 
-    fn compile_return(self: &mut Self) -> Res {
+    fn compile_return(&mut self) -> Res {
         assert_eq!(self.tokens.unwrap_keyword(), "return");
         if matches!(self.tokens.peek().unwrap(), Symbol(';')) {
             // Return dummy value in `void` case
@@ -253,7 +253,7 @@ impl<'a, Writer: Write> CompilationEngine<'a, Writer> {
         Ok(())
     }
 
-    fn compile_do(self: &mut Self) -> Res {
+    fn compile_do(&mut self) -> Res {
         assert_eq!(self.tokens.unwrap_keyword(), "do");
         self.compile_term_inner()?;
         assert_eq!(self.tokens.unwrap_symbol(), ';');
@@ -262,7 +262,7 @@ impl<'a, Writer: Write> CompilationEngine<'a, Writer> {
         Ok(())
     }
 
-    fn compile_while(self: &mut Self) -> Res {
+    fn compile_while(&mut self) -> Res {
         let label_start = self.create_label("WHILE_EXP");
         let label_end = self.create_label("WHILE_END");
         assert_eq!(self.tokens.unwrap_keyword(), "while");
@@ -281,7 +281,7 @@ impl<'a, Writer: Write> CompilationEngine<'a, Writer> {
         Ok(())
     }
 
-    fn compile_if(self: &mut Self) -> Res {
+    fn compile_if(&mut self) -> Res {
         let label_else = self.create_label("IF_FALSE");
         let label_end = self.create_label("IF_TRUE");
 
@@ -309,7 +309,7 @@ impl<'a, Writer: Write> CompilationEngine<'a, Writer> {
         Ok(())
     }
 
-    fn compile_let(self: &mut Self) -> Res {
+    fn compile_let(&mut self) -> Res {
         assert_eq!(self.tokens.unwrap_keyword(), "let");
         let dest_ident = self.tokens.unwrap_identifier();
         let is_arr = matches!(self.tokens.peek().unwrap(), Symbol('['));
@@ -335,14 +335,14 @@ impl<'a, Writer: Write> CompilationEngine<'a, Writer> {
         Ok(())
     }
 
-    fn compile_term(self: &mut Self) -> Res {
+    fn compile_term(&mut self) -> Res {
         self.compile_term_inner()?;
         Ok(())
     }
 
-    fn compile_term_inner(self: &mut Self) -> Res {
+    fn compile_term_inner(&mut self) -> Res {
         let t1 = self.tokens.next().unwrap();
-        Ok(match (&t1, self.tokens.peek().unwrap()) {
+        match (&t1, self.tokens.peek().unwrap()) {
             (Keyword("true"), _) => writeln!(self.out, "push constant 1\nneg").unwrap(),
             (Keyword("false") | Keyword("null"), _) => {
                 writeln!(self.out, "push constant 0").unwrap()
@@ -408,10 +408,11 @@ impl<'a, Writer: Write> CompilationEngine<'a, Writer> {
                 self.push(ident_name);
             }
             _ => return Err("Unexpected token in term"),
-        })
+        };
+        Ok(())
     }
 
-    fn compile_expression_list(self: &mut Self) -> Result<usize, &'static str> {
+    fn compile_expression_list(&mut self) -> Result<usize, &'static str> {
         let mut n = 0;
         loop {
             match self.tokens.peek().unwrap() {
@@ -428,7 +429,7 @@ impl<'a, Writer: Write> CompilationEngine<'a, Writer> {
         Ok(n)
     }
 
-    fn compile_expression(self: &mut Self) -> Res {
+    fn compile_expression(&mut self) -> Res {
         self.compile_term()?;
         loop {
             let op = match self.tokens.peek().unwrap() {
@@ -475,7 +476,7 @@ impl<'a, Writer: Write> CompilationEngine<'a, Writer> {
         }
         Ok(())
     }
-    fn compile_variable_declaration(self: &mut Self) -> Res {
+    fn compile_variable_declaration(&mut self) -> Res {
         assert!(matches!(self.tokens.next().unwrap(), Keyword("var")));
         let typ = self.tokens.next().unwrap();
         let name = self.tokens.unwrap_identifier();
@@ -516,6 +517,6 @@ impl<'a, Writer: Write> CompilationEngine<'a, Writer> {
     pub fn uid(&mut self) -> usize {
         let out = self._uid;
         self._uid += 1;
-        return out;
+        out
     }
 }
