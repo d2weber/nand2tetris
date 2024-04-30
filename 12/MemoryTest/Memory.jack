@@ -8,26 +8,65 @@
  * consists of 32,768 words, each holding a 16-bit binary number.
  */ 
 class Memory {
+    static Array addr;
+    static int heapbase;
+    static int free_list;
 
     /** Initializes the class. */
     function void init() {
+        let addr = 0;
+        let heapbase = 2048;
+        let free_list = heapbase;
+        // size of heap
+        let addr[free_list] = 16384 /*16K*/ - heapbase;
+        let addr[free_list+1] = 0;
+        return;
     }
 
     /** Returns the RAM value at the given address. */
     function int peek(int address) {
+        return addr[address];
     }
 
     /** Sets the RAM value at the given address to the given value. */
     function void poke(int address, int value) {
+        let addr[address] = value;
+        return;
     }
 
     /** Finds an available RAM block of the given size and returns
      *  a reference to its base address. */
     function int alloc(int size) {
+        var int space, free;
+
+        // Pointer to current free block
+        let free = free_list;
+        // Size of current block
+        let space = addr[free];
+        while (space < (size + 2 /*for free list node*/ + 1 /*for new block size*/)) {
+            let free = addr[free+1];
+            if (free = 0) {
+                // TODO: Defragmenation
+                do Sys.error(6);
+            }
+            let space = addr[free];
+        }
+        // Adjust old block size
+        let addr[free] = space - size - 1;
+
+        // Carve new block
+        let free = free + space - size;
+        let addr[free-1] = size;
+
+        return free;
     }
 
     /** De-allocates the given object (cast as an array) by making
      *  it available for future allocations. */
     function void deAlloc(Array o) {
-    }    
+        // Append to front
+        let addr[o] = free_list;
+        let free_list = o-1;
+        return;
+    }
 }
