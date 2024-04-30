@@ -15,6 +15,20 @@ class Math {
 
     // Initializes the Math library.
     function void init() {
+        var int i;
+        var int v;
+
+        let n = 16;
+        let powersOfTwo = Array.new(n);
+
+        let v = 1;
+        let i = 0;
+        while (i<n) {
+            let powersOfTwo[i] = v;
+            let v = v + v;
+            let i = i+1;
+        }
+        return;
     }
 
     /** Returns the product of x and y. 
@@ -22,6 +36,20 @@ class Math {
      *  in an expression, it handles it by invoking this method. 
      *  Thus, in Jack, x * y and Math.multiply(x,y) return the same value. */
     function int multiply(int x, int y) {
+        var int sum, i;
+
+        let sum = 0;
+
+        let i = 0;
+        while (i<n) {
+            if (~((powersOfTwo[i] & y) = 0)) {
+                let sum = sum + x;
+            }
+            let x = x + x;
+            let i = i + 1;
+        }
+
+        return sum;
     }
 
     /** Returns the integer part of x / y.
@@ -29,21 +57,89 @@ class Math {
      *  an an expression, it handles it by invoking this method.
      *  Thus, x/y and Math.divide(x,y) return the same value. */
     function int divide(int x, int y) {
+        var int out;
+
+        if (x=0) {
+            let out = 0;
+        } else {
+            if (y = 0) {
+                do Sys.error(3);
+            }
+
+            let out = Math.divide_pos(Math.abs(x), Math.abs(y));
+            if ((powersOfTwo[15] & x) = (powersOfTwo[15] & y)) {
+                // sign is the same
+            } else {
+                let out = -out;
+            }
+        }
+        return out;
+    }
+
+    function int divide_pos(int x, int y) {
+        var int tmp;
+
+        if (y < 0) {
+            // overflow
+            do Sys.error(21);
+        }
+        if (y > x) {
+            let tmp = 0;
+        } else {
+            let tmp = Math.divide_pos(x, y + y);
+            let tmp = tmp + tmp;
+            if ((x - (tmp * y)) < y) {
+                // let tmp = tmp
+            } else {
+                let tmp = tmp + 1;
+            }
+        }
+        return tmp;
     }
 
     /** Returns the integer part of the square root of x. */
     function int sqrt(int x) {
+        var int y, tmp, j;
+        
+        if (x < 0) {
+            do Sys.error(4);
+        }
+
+
+        let y = 0;
+        let j = n/2;
+        while (j > 0) {
+            let j = j - 1;
+            let tmp = y + powersOfTwo[j];
+            let tmp = tmp*tmp;
+            if (~(x < tmp) & (0 < tmp)) {
+                let y = y + powersOfTwo[j];
+            }
+        }
+        return y;
     }
 
     /** Returns the greater value. */
     function int max(int a, int b) {
+        if (a < b) {
+            let a = b;
+        }
+        return a;
     }
 
     /** Returns the smaller value. */
     function int min(int a, int b) {
+        if (b < a) {
+            let a = b;
+        }
+        return a;
     }
 
     /** Returns the absolute value of x. */
     function int abs(int x) {
+        if (x < 0) {
+            let x = -x;
+        }
+        return x;
     }
 }
