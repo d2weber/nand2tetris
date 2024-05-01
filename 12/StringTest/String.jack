@@ -10,54 +10,149 @@
  * string-oriented operations.
  */
 class String {
+    field Array data;
+    field int max_len, len;
 
     /** constructs a new empty string with a maximum length of maxLength
      *  and initial length of 0. */
-    constructor String new(int maxLength) {
+    constructor String new(int max_length) {
+        let max_len = max_length;
+        if (0 < max_len) {
+            let data = Array.new(max_len);
+        }
+        let len = 0;
+        return this;
     }
 
     /** Disposes this string. */
     method void dispose() {
+        if (0 < max_len) {
+            do data.dispose();
+        }
+        do Memory.deAlloc(this);
+        return;
     }
 
     /** Returns the current length of this string. */
     method int length() {
+        return len;
     }
 
     /** Returns the character at the j-th location of this string. */
     method char charAt(int j) {
+        if (isOutOfBounds(j)) {
+            do Sys.error(15);
+        }
+        return data[j];
     }
 
     /** Sets the character at the j-th location of this string to c. */
     method void setCharAt(int j, char c) {
+        if (isOutOfBounds(j)) {
+            do Sys.error(16);
+        }
+        let data[j] = c;
+        return;
     }
 
     /** Appends c to this string's end and returns this string. */
     method String appendChar(char c) {
+        if (len = max_len) {
+            do Sys.error(17);
+        }
+        let data[len] = c;
+        let len = len + 1;
+        return this;
     }
 
     /** Erases the last character from this string. */
     method void eraseLastChar() {
+        if (len = 0) {
+            do Sys.error(18);
+        }
+        let len = len - 1;
+        return;
     }
 
     /** Returns the integer value of this string, 
      *  until a non-digit character is detected. */
     method int intValue() {
+        var int j, sum, denom;
+
+        let sum = 0;
+        let denom = 1;
+        if (0 < len) {
+            // Iterate string backwards
+            let j = len-1;
+            while (0 < j) {
+                if (String.is_digit(data[j])) {
+                    let sum = sum + ((data[j] - 48) * denom);
+                    let denom = denom * 10;
+                } else {
+                    let sum = 0;
+                    let denom = 1;
+                }
+                let j = j - 1;
+            }
+            if (data[0] = 45 /*minus character*/) {
+                let sum = -sum;
+            } else {
+                if (String.is_digit(data[0])) {
+                    let sum = sum + ((data[0] - 48) * denom);
+                } else {
+                    let sum = 0;
+                }
+            }
+        }
+        return sum;
+    }
+
+    function bool is_digit(char c) {
+        return ~(c < 48) & ~(57 < c);
     }
 
     /** Sets this string to hold a representation of the given value. */
     method void setInt(int val) {
+        var int q, rest, denom;
+
+        let len = 0;
+        if (val < 0) {
+            do appendChar(45 /*minus sign*/);
+        }
+
+        let val = Math.abs(val);
+        let rest = val;
+
+        let denom = 10000;
+        while (1 < denom) {
+            if ((denom-1) < val) {
+                let q = rest / denom;
+                do appendChar(q+48);
+                let rest = rest - (denom * q);
+            }
+            let denom = denom / 10;
+        }
+        do appendChar(rest+48);
+
+        return;
     }
 
     /** Returns the new line character. */
     function char newLine() {
+        return 128;
     }
 
     /** Returns the backspace character. */
     function char backSpace() {
+        return 129;
     }
 
     /** Returns the double quote (") character. */
     function char doubleQuote() {
+        return 34;
+    }
+
+    method boolean isOutOfBounds(int j) {
+        return (j < 0) | ((len-1) < j);
     }
 }
