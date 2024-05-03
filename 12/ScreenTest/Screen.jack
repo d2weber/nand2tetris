@@ -132,36 +132,34 @@ class Screen {
         return;
     }
 
+    /// Requires x1!=x2 and y1!=y2
     function void _drawDiagonal(int x1, int y1, int x2, int y2) {
-        var int x, y, dx, dy, a, b, diff, da, db;
+        var int tmp, dx, dy, a, b, diff;
 
-        // TODO: simplify
-        let x = x1;
-        let y = y1;
-        let dx = x2 - x1;
-        if (dx<0) {
-            let dx = -dx;
-            let da = -1;
-        } else {
-            let da = 1;
+        if ((x2-x1)<0) {
+            // Swap point 1 and point 2
+            let tmp = x1; let x1 = x2; let x2 = tmp;
+            let tmp = y1; let y1 = y2; let y2 = tmp;
         }
-        let dy = y2 - y1;
-        if (dy<0) {
-            let dy = -dy;
-            let db = -1;
+        let dx = x2-x1; // is always positive
+
+        if ((y2-y1)<0) {
+            let tmp = -1; // falling edge:  \
         } else {
-            let db = 1;
+            let tmp = 1;  //  rising edge:  /
         }
+        let dy = Math.abs(y2-y1);
+
         let a = 0;
         let b = 0;
         let diff = 0;
-        while ( ~( (a=(x2-x1)) | (b=(y2-y1)) ) ) {
-            do Screen.drawPixel(x + a, y + b);
+        while ( ~( (a=dx) | (b=dy) ) ) {
+            do Screen.drawPixel(x1 + a, y1 + b);
             if (diff<0) {
-                let a = a + da;
+                let a = a + 1;
                 let diff = diff + dy;
             } else {
-                let b = b + db;
+                let b = b + tmp;
                 let diff = diff - dx;
             }
         }
